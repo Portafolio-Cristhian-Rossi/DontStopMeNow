@@ -1,5 +1,6 @@
 import type { Album, Catalog, Playlist, Track } from '@dsmn/shared';
-import type { FetchLike } from '../src/core/types.ts';
+import { DatabaseSync } from 'node:sqlite';
+import type { FetchLike, SqlDb, SqlValue } from '../src/core/types.ts';
 
 type FakeResponse = { status: number; body?: unknown; headers?: Record<string, string> };
 type Route =
@@ -71,4 +72,19 @@ export function makeCatalog(partial: Partial<Catalog> = {}): Catalog {
     { id: 'p1', name: 'Lista', type: 'manual', folder: null, trackIds: ['t2', 't3'] },
   ];
   return { serverId: 'srv', revision: 1, tracks, albums, playlists, ...partial };
+}
+
+/** SqlDb sobre node:sqlite en memoria, con la misma interfaz que el adaptador de expo-sqlite. */
+export function sqliteDb(db: DatabaseSync = new DatabaseSync(':memory:')): SqlDb {
+  const plain = <T>(row: unknown) => (row ? ({ ...(row as object) } as T) : null);
+  return {
+    exec: (sql) => db.exec(sql),
+    run: (sql, ...params) => void db.prepare(sql).run(...params),
+    all: <T>(sql: string, ...params: SqlValue[]) =>
+      db
+        .prepare(sql)
+        .all(...params)
+        .map((r) => plain<T>(r)!),
+    first: <T>(sql: string, ...params: SqlValue[]) => plain<T>(db.prepare(sql).get(...params)),
+  };
 }

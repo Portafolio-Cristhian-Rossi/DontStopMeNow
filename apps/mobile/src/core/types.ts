@@ -16,3 +16,13 @@ export interface PairedServer {
 export interface Discovery {
   find(serverId: string, timeoutMs: number): Promise<string | null>;
 }
+
+export type SqlValue = string | number | null;
+
+/** Base SQL síncrona mínima (la implementan expo-sqlite en el celular y node:sqlite en los tests). */
+export interface SqlDb {
+  exec(sql: string): void;
+  run(sql: string, ...params: SqlValue[]): void;
+  all<T>(sql: string, ...params: SqlValue[]): T[];
+  first<T>(sql: string, ...params: SqlValue[]): T | null;
+}
