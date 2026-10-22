@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { statSync } from 'node:fs';
-import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { CreatePlaylistRequest, Playlist, UpdatePlaylistRequest } from '@dsmn/shared';
 import type { EventBus } from '../events.ts';
 import { HttpError } from '../http/errors.ts';
 import { getPlaylist } from './catalog.ts';
-import { toRelPath } from './paths.ts';
+import { resolveRelDir } from './paths.ts';
 import { bumpRevision } from './revision.ts';
 
 function assertTracksExist(db: DatabaseSync, trackIds: string[]): void {
@@ -25,16 +24,9 @@ function setTracks(db: DatabaseSync, playlistId: string, trackIds: string[]): vo
 function resolveFolder(db: DatabaseSync, rootId: number, folderRelPath: string): string {
   const root = db.prepare('SELECT path FROM roots WHERE id = ?').get(rootId) as { path: string } | undefined;
   if (!root) throw new HttpError(400, 'bad_request', `Carpeta raíz desconocida: ${rootId}`);
-  const rel = folderRelPath.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '');
-  if (rel.split('/').includes('..'))
-    throw new HttpError(400, 'bad_request', 'La carpeta no puede contener ".."');
-  const abs = path.resolve(root.path, ...rel.split('/'));
-  let normalized: string;
-  try {
-    normalized = toRelPath(root.path, abs);
-  } catch {
-    throw new HttpError(400, 'bad_request', 'La carpeta está fuera de la raíz');
-  }
+  const resolved = resolveRelDir(root.path, folderRelPath);
+  if (!resolved) throw new HttpError(400, 'bad_request', 'La carpeta debe estar dentro de la raíz');
+  const { abs, rel } = resolved;
   let isDir = false;
   try {
     isDir = statSync(abs).isDirectory();
@@ -42,7 +34,7 @@ function resolveFolder(db: DatabaseSync, rootId: number, folderRelPath: string):
     // no existe
   }
   if (!isDir) throw new HttpError(400, 'bad_request', `La carpeta no existe: ${rel}`);
-  return normalized;
+  return rel;
 }
 
 function inTransaction<T>(db: DatabaseSync, fn: () => T): T {

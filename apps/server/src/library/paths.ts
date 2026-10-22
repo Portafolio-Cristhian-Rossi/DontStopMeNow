@@ -13,3 +13,18 @@ export function toRelPath(rootPath: string, absPath: string, p: nodePath.Platfor
 export function isUnderRelDir(relPath: string, relDir: string): boolean {
   return relDir === '' || relPath === relDir || relPath.startsWith(relDir + '/');
 }
+
+/**
+ * Normaliza una carpeta relativa escrita por el usuario ("\\" o "/", con o sin barras en los extremos)
+ * y la resuelve dentro de la raíz. Devuelve null si contiene ".." o queda fuera de la raíz.
+ */
+export function resolveRelDir(rootPath: string, relDir: string): { abs: string; rel: string } | null {
+  const rel = relDir.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '');
+  if (rel.split('/').includes('..')) return null;
+  const abs = rel ? nodePath.resolve(rootPath, ...rel.split('/')) : rootPath;
+  try {
+    return { abs, rel: toRelPath(rootPath, abs) };
+  } catch {
+    return null;
+  }
+}
