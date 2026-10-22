@@ -21,3 +21,14 @@ export function getLanUrls(port: number, ifaces = os.networkInterfaces()): strin
   const privateIps = candidates.filter(isPrivateIPv4);
   return (privateIps.length ? privateIps : candidates).map((ip) => `http://${ip}:${port}`);
 }
+
+/** Texto que muestra el servidor al arrancar. */
+export function startupMessage(port: number, lanUrls: string[]): string {
+  const lines = [`Abrí http://localhost:${port} en esta compu para gestionar tu música.`];
+  if (lanUrls.length) {
+    lines.push('Direcciones para el celular:', ...lanUrls.map((u) => `  ${u}`));
+  } else {
+    lines.push('No se detectó una red local: el celular no va a poder conectarse.');
+  }
+  return lines.join('\n');
+}

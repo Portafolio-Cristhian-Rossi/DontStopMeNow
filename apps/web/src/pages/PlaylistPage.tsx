@@ -37,7 +37,7 @@ interface RowProps {
 }
 
 function SortableRow({ id, index, track, album, last, busy, onMove, onRemove }: RowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id, disabled: busy });
   return (
     <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
       <td>
@@ -83,6 +83,8 @@ export function PlaylistPage() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Orden que se está guardando: se muestra al instante y se descarta cuando llega el catálogo nuevo.
+  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -96,7 +98,8 @@ export function PlaylistPage() {
 
   const tracksById = new Map(data.tracks.map((t) => [t.id, t]));
   const albums = new Map(data.albums.map((a) => [a.id, a]));
-  const entries = playlist.trackIds.flatMap((tid, i) => {
+  const trackIds = pendingOrder ?? playlist.trackIds;
+  const entries = trackIds.flatMap((tid, i) => {
     const track = tracksById.get(tid);
     return track ? [{ key: `${i}-${tid}`, index: i, track }] : [];
   });
@@ -114,9 +117,13 @@ export function PlaylistPage() {
     }
   }
 
-  const saveOrder = (trackIds: string[]) => act(() => api.updatePlaylist(id, { trackIds }));
-  const move = (from: number, to: number) => void saveOrder(arrayMove(playlist.trackIds, from, to));
-  const remove = (index: number) => void saveOrder(playlist.trackIds.filter((_, i) => i !== index));
+  async function saveOrder(next: string[]) {
+    setPendingOrder(next);
+    await act(() => api.updatePlaylist(id, { trackIds: next }));
+    setPendingOrder(null);
+  }
+  const move = (from: number, to: number) => void saveOrder(arrayMove(trackIds, from, to));
+  const remove = (index: number) => void saveOrder(trackIds.filter((_, i) => i !== index));
 
   function rename(value: string) {
     const trimmed = value.trim();

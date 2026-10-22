@@ -11,4 +11,5 @@ export const queryKeys = {
 export const useCatalog = () => useQuery({ queryKey: queryKeys.catalog, queryFn: api.catalog });
 export const useRoots = () => useQuery({ queryKey: queryKeys.roots, queryFn: api.roots });
 export const useIssues = () => useQuery({ queryKey: queryKeys.issues, queryFn: api.issues });
-export const useDevices = () => useQuery({ queryKey: queryKeys.devices, queryFn: api.devices });
+export const useDevices = (opts: { refetchInterval?: number } = {}) =>
+  useQuery({ queryKey: queryKeys.devices, queryFn: api.devices, ...opts });

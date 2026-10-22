@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.ts';
 import { queryKeys, useDevices } from '../api/queries.ts';
 
@@ -13,7 +13,10 @@ function countdown(ms: number): string {
 
 const formatDate = (ms: number) => new Date(ms).toLocaleString('es-AR');
 
-function PairingCard() {
+/** Cada cuánto se revisa si se vinculó un celular mientras la página está abierta. */
+const DEVICES_POLL_MS = 2500;
+
+function PairingCard({ deviceCount }: { deviceCount: number | undefined }) {
   const pairing = useQuery({
     queryKey: ['pairing-code'],
     queryFn: api.pairingCode,
@@ -40,6 +43,15 @@ function PairingCard() {
     };
   }, [data, refetch]);
 
+  // Un celular nuevo usó el código (es de un solo uso): se pide otro.
+  const lastCount = useRef(deviceCount);
+  useEffect(() => {
+    if (deviceCount !== undefined && lastCount.current !== undefined && deviceCount > lastCount.current) {
+      void refetch();
+    }
+    lastCount.current = deviceCount;
+  }, [deviceCount, refetch]);
+
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
@@ -61,7 +73,7 @@ function PairingCard() {
 }
 
 export function DevicesPage() {
-  const devices = useDevices();
+  const devices = useDevices({ refetchInterval: DEVICES_POLL_MS });
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +92,7 @@ export function DevicesPage() {
     <>
       <h1>Dispositivos</h1>
       <h2>Vincular un celular</h2>
-      <PairingCard />
+      <PairingCard deviceCount={devices.data?.length} />
 
       <h2>Celulares vinculados</h2>
       {error && <p className="error">{error}</p>}
