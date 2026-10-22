@@ -1,10 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreatePlaylistRequestSchema,
+  EnqueueRequestSchema,
   PairRequestSchema,
+  PreviewRequestSchema,
   QrPayloadSchema,
   UpdatePlaylistRequestSchema,
 } from '../src/index.ts';
+
+describe('esquemas de descargas', () => {
+  it('PreviewRequest solo acepta http(s)', () => {
+    expect(PreviewRequestSchema.safeParse({ url: 'https://www.youtube.com/playlist?list=PL1' }).success).toBe(
+      true,
+    );
+    expect(PreviewRequestSchema.safeParse({ url: '--exec calc' }).success).toBe(false);
+    expect(PreviewRequestSchema.safeParse({ url: 'file:///C:/x' }).success).toBe(false);
+  });
+
+  it('EnqueueRequest exige al menos una canción', () => {
+    const base = {
+      url: 'https://y/p',
+      title: 'P',
+      kind: 'playlist',
+      ytPlaylistId: 'PL1',
+      playlistSize: 3,
+      rootId: 1,
+      folder: 'P',
+    };
+    expect(EnqueueRequestSchema.safeParse({ ...base, items: [] }).success).toBe(false);
+    expect(
+      EnqueueRequestSchema.safeParse({ ...base, items: [{ videoId: 'a', position: 1, title: 'A' }] }).success,
+    ).toBe(true);
+  });
+});
 
 describe('schemas', () => {
   it('CreatePlaylistRequest discrimina por type', () => {
