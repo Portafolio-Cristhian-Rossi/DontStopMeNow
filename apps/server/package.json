@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@dsmn/shared": "*",
+    "fastify": "^5.12.7",
     "music-metadata": "^12.2.3"
   }
 }
