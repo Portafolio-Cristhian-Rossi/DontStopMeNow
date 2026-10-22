@@ -21,7 +21,7 @@ import {
   type SyncProgress,
   type SyncReport,
 } from '../core/syncEngine.ts';
-import type { Discovery, FetchLike, PairedServer } from '../core/types.ts';
+import type { Discovery, FetchLike, FileStore, PairedServer } from '../core/types.ts';
 import { createDiscovery, createDownloader, createFileStore, openSqlDb } from '../native/index.ts';
 
 const appFetch = fetch as unknown as FetchLike;
@@ -45,6 +45,10 @@ export interface AppValue {
   /** null mientras no se sabe; false si la última vez no se encontró el servidor. */
   online: boolean | null;
   discovery: Discovery;
+  store: LocalStore;
+  files: FileStore;
+  /** El reproductor registra acá cómo saber qué canción suena (no se borra al sincronizar). */
+  setPlayingTrackProvider(fn: () => string | null): void;
   freeBytes(): number;
   /** URI local de una portada, o null si no está en el celular. */
   coverUri(coverId: string | null): string | null;
@@ -105,6 +109,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const playingTrack = useRef<() => string | null>(() => null);
   const running = useRef<Promise<void> | null>(null);
 
   const startSync = useCallback((): Promise<void> => {
@@ -130,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           files,
           downloader: deps.downloader,
           signal: abort.signal,
+          protectedTrackIds: new Set([playingTrack.current()].filter((id): id is string => id !== null)),
           onProgress: (p) => {
             const now = Date.now();
             if (p.phase === 'downloading' && now - lastEmit < PROGRESS_THROTTLE_MS) return;
@@ -190,6 +196,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sync,
       online,
       discovery: deps.discovery,
+      store,
+      files,
+      setPlayingTrackProvider: (fn) => {
+        playingTrack.current = fn;
+      },
       freeBytes: () => files.freeBytes(),
       coverUri: (coverId) => {
         if (!coverId) return null;

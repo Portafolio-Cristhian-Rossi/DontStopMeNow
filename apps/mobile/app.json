@@ -8,7 +8,13 @@
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.cristhianrossi.dontstopmenow",
-      "permissions": ["CHANGE_WIFI_MULTICAST_STATE", "ACCESS_WIFI_STATE"]
+      "permissions": ["CHANGE_WIFI_MULTICAST_STATE", "ACCESS_WIFI_STATE", "POST_NOTIFICATIONS"],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -26,6 +32,13 @@
           "android": {
             "usesCleartextTraffic": true
           }
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "recordAudioAndroid": false
         }
       ]
     ]
