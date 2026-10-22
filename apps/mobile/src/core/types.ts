@@ -26,3 +26,29 @@ export interface SqlDb {
   all<T>(sql: string, ...params: SqlValue[]): T[];
   first<T>(sql: string, ...params: SqlValue[]): T | null;
 }
+
+/** Archivos de la app (en el celular, el almacenamiento privado; en los tests, memoria). */
+export interface FileStore {
+  musicDir: string;
+  exists(path: string): boolean;
+  size(path: string): number;
+  read(path: string, offset: number, length: number): Promise<Uint8Array>;
+  move(from: string, to: string): void;
+  remove(path: string): void;
+  freeBytes(): number;
+}
+
+/**
+ * Descarga un archivo a `dest`. Si `signal` se aborta, pausa y devuelve el estado para retomar.
+ * Lanza en errores de red o HTTP (401 → UnauthorizedError).
+ */
+export interface Downloader {
+  download(req: {
+    url: string;
+    headers: Record<string, string>;
+    dest: string;
+    resumeState?: string;
+    onProgress(bytes: number): void;
+    signal: AbortSignal;
+  }): Promise<{ status: 'done' } | { status: 'paused'; state: string }>;
+}

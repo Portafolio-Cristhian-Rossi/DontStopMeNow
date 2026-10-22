@@ -1,6 +1,14 @@
-import type { Album, Catalog, Playlist, Track } from '@dsmn/shared';
+import {
+  FINGERPRINT_WINDOW,
+  fingerprintFromWindows,
+  type Album,
+  type Catalog,
+  type Playlist,
+  type Track,
+} from '@dsmn/shared';
 import { DatabaseSync } from 'node:sqlite';
-import type { FetchLike, SqlDb, SqlValue } from '../src/core/types.ts';
+import { ServerUnreachableError, UnauthorizedError } from '../src/core/http.ts';
+import type { Downloader, FetchLike, FileStore, SqlDb, SqlValue } from '../src/core/types.ts';
 
 type FakeResponse = { status: number; body?: unknown; headers?: Record<string, string> };
 type Route =
@@ -87,4 +95,76 @@ export function sqliteDb(db: DatabaseSync = new DatabaseSync(':memory:')): SqlDb
         .map((r) => plain<T>(r)!),
     first: <T>(sql: string, ...params: SqlValue[]) => plain<T>(db.prepare(sql).get(...params)),
   };
+}
+
+/** FileStore en memoria. */
+export function memoryFiles(
+  freeBytes = 10 * 1024 ** 3,
+): FileStore & { files: Map<string, Uint8Array>; free: number } {
+  const files = new Map<string, Uint8Array>();
+  const store = {
+    files,
+    free: freeBytes,
+    musicDir: '/music',
+    exists: (p: string) => files.has(p),
+    size: (p: string) => files.get(p)?.length ?? 0,
+    read: async (p: string, offset: number, length: number) =>
+      (files.get(p) ?? new Uint8Array()).slice(offset, offset + length),
+    move: (from: string, to: string) => {
+      const data = files.get(from);
+      if (!data) throw new Error(`No existe ${from}`);
+      files.set(to, data);
+      files.delete(from);
+    },
+    remove: (p: string) => void files.delete(p),
+    freeBytes: () => store.free,
+  };
+  return store;
+}
+
+export type Behavior = 'pause' | 'fail' | 'unauthorized' | 'unreachable' | Uint8Array | undefined;
+
+/**
+ * Descargador falso: escribe en `dest` el contenido de cada URL. `behave(url, intento)` puede
+ * simular pausas, fallas o contenido corrupto.
+ */
+export function fakeDownloader(
+  files: ReturnType<typeof memoryFiles>,
+  contents: Map<string, Uint8Array>,
+  behave: (url: string, attempt: number) => Behavior = () => undefined,
+): Downloader & { calls: { url: string; resumeState?: string; headers: Record<string, string> }[] } {
+  const attempts = new Map<string, number>();
+  const calls: { url: string; resumeState?: string; headers: Record<string, string> }[] = [];
+  return {
+    calls,
+    async download(req) {
+      calls.push({ url: req.url, resumeState: req.resumeState, headers: req.headers });
+      const attempt = (attempts.get(req.url) ?? 0) + 1;
+      attempts.set(req.url, attempt);
+      const b = behave(req.url, attempt);
+      if (b === 'pause') return { status: 'paused', state: `estado-${req.url}` };
+      if (b === 'fail') throw new Error('Falla de red');
+      if (b === 'unauthorized') throw new UnauthorizedError('revocado');
+      if (b === 'unreachable') throw new ServerUnreachableError();
+      const data = b instanceof Uint8Array ? b : contents.get(req.url);
+      if (!data) throw new Error(`Sin contenido para ${req.url}`);
+      files.files.set(req.dest, data);
+      req.onProgress(data.length);
+      return { status: 'done' };
+    },
+  };
+}
+
+/** Canción cuyo tamaño y huella corresponden a `data`. */
+export function trackFor(id: string, data: Uint8Array, partial: Partial<Track> = {}): Track {
+  const head = data.length <= 2 * FINGERPRINT_WINDOW ? data : data.subarray(0, FINGERPRINT_WINDOW);
+  const tail =
+    data.length <= 2 * FINGERPRINT_WINDOW
+      ? new Uint8Array()
+      : data.subarray(data.length - FINGERPRINT_WINDOW);
+  return makeTrack(id, {
+    size: data.length,
+    fingerprint: fingerprintFromWindows(data.length, head, tail),
+    ...partial,
+  });
 }
