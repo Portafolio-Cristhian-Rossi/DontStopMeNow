@@ -27,12 +27,19 @@ export function libraryView(catalog: Catalog, downloadedIds: Set<string>): Libra
 }
 
 function selectedTrackIds(catalog: Catalog, selection: Selection[]): Set<string> {
+  const albums = new Map(catalog.albums.map((a) => [a.id, a.trackIds]));
+  const playlists = new Map(catalog.playlists.map((p) => [p.id, p.trackIds]));
   const ids = new Set<string>();
   for (const sel of selection) {
-    const list = sel.kind === 'album' ? catalog.albums : catalog.playlists;
-    for (const id of list.find((e) => e.id === sel.id)?.trackIds ?? []) ids.add(id);
+    for (const id of (sel.kind === 'album' ? albums : playlists).get(sel.id) ?? []) ids.add(id);
   }
   return ids;
+}
+
+/** Función que suma tamaños de canciones; arma el índice una sola vez por catálogo. */
+export function sizeLookup(catalog: Catalog): (trackIds: string[]) => number {
+  const sizes = new Map(catalog.tracks.map((t) => [t.id, t.size]));
+  return (trackIds) => trackIds.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0);
 }
 
 /** Cuántas canciones distintas y cuántos bytes suma la selección (las compartidas cuentan una vez). */
@@ -41,10 +48,9 @@ export function selectionSummary(
   selection: Selection[],
 ): { trackCount: number; bytes: number } {
   const ids = selectedTrackIds(catalog, selection);
-  return { trackCount: ids.size, bytes: entrySize(catalog, [...ids]) };
+  return { trackCount: ids.size, bytes: sizeLookup(catalog)([...ids]) };
 }
 
 export function entrySize(catalog: Catalog, trackIds: string[]): number {
-  const sizes = new Map(catalog.tracks.map((t) => [t.id, t.size]));
-  return trackIds.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0);
+  return sizeLookup(catalog)(trackIds);
 }

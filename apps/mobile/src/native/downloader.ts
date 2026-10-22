@@ -9,14 +9,20 @@ import type { Downloader } from '../core/types.ts';
 export function createDownloader(): Downloader {
   return {
     async download({ url, headers, dest, resumeState, onProgress, signal }) {
+      if (signal.aborted && resumeState) return { status: 'paused', state: resumeState };
       const options = { headers, onProgress: (p: { bytesWritten: number }) => onProgress(p.bytesWritten) };
       const task = resumeState
         ? DownloadTask.fromSavable(JSON.parse(resumeState), options)
         : File.createDownloadTask(url, new File(dest), options);
-      const onAbort = () => task.pause();
+      // Pausar solo tiene sentido (y solo es válido) mientras la descarga está activa.
+      const onAbort = () => {
+        if (task.state === 'active') task.pause();
+      };
       signal.addEventListener('abort', onAbort);
       try {
-        const file = await (resumeState ? task.resumeAsync() : task.downloadAsync());
+        const run = resumeState ? task.resumeAsync() : task.downloadAsync();
+        if (signal.aborted) onAbort();
+        const file = await run;
         if (file === null) return { status: 'paused', state: JSON.stringify(task.savable()) };
         return { status: 'done' };
       } catch (err) {

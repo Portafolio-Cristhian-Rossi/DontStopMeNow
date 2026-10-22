@@ -50,6 +50,17 @@ export interface SyncDeps {
 
 const isFatal = (err: unknown) => err instanceof UnauthorizedError || err instanceof ServerUnreachableError;
 
+/** Mensaje en español para una canción que no se pudo bajar. */
+export function describeDownloadError(err: unknown): string {
+  if (err instanceof FingerprintMismatchError) return err.message;
+  const message = err instanceof Error ? err.message : String(err);
+  if (/HTTP 409/.test(message)) return 'La carpeta de esta canción no está conectada en la compu';
+  if (/HTTP 404/.test(message)) return 'La canción ya no está en la compu';
+  const status = /HTTP (\d{3})/.exec(message)?.[1];
+  if (status) return `El servidor respondió con un error (${status})`;
+  return 'Se cortó la descarga';
+}
+
 async function fingerprintOf(files: FileStore, path: string): Promise<string> {
   const size = files.size(path);
   if (size <= 2 * FINGERPRINT_WINDOW)
@@ -92,6 +103,9 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
   const bytesTotal = plan.download.reduce((sum, t) => sum + t.size, 0);
   const available = files.freeBytes() - FREE_SPACE_MARGIN;
   if (bytesTotal > available) throw new InsufficientSpaceError(bytesTotal - available);
+
+  // Detener (o desvincular) antes de llegar acá no debe borrar nada.
+  if (signal.aborted) return { ...report, paused: true };
 
   // 4. Borrados.
   emit({ phase: 'deleting', done: 0, total: plan.download.length, bytesDone: 0, bytesTotal });
@@ -167,6 +181,27 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
   const queue = [...plan.download];
   let fatal: unknown = null;
 
+  /** Espera que termina antes si se aborta la sincronización. */
+  function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const done = () => {
+        signal.removeEventListener('abort', done);
+        resolve();
+      };
+      signal.addEventListener('abort', done);
+      void sleep(ms).then(done);
+    });
+  }
+
+  /** Tras un error de una canción: si el servidor ya no responde, se corta todo (no tiene sentido seguir). */
+  async function checkServer(): Promise<void> {
+    try {
+      await client.catalog(store.getCatalog()?.etag);
+    } catch (err) {
+      if (isFatal(err)) throw err;
+    }
+  }
+
   async function worker() {
     while (queue.length > 0 && !fatal && !report.paused) {
       if (signal.aborted) {
@@ -180,19 +215,24 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
           else report.paused = true;
           break;
         } catch (err) {
-          if (isFatal(err)) {
-            fatal ??= err;
+          try {
+            if (isFatal(err)) throw err;
+            if (!(err instanceof FingerprintMismatchError)) await checkServer();
+          } catch (fatalErr) {
+            fatal ??= fatalErr;
             return;
           }
+          if (fatal) return;
           const retryable = !(err instanceof FingerprintMismatchError) && attempt < RETRY_DELAYS_MS.length;
-          if (!retryable || signal.aborted) {
-            report.failed.push({
-              trackId: track.id,
-              error: err instanceof Error ? err.message : String(err),
-            });
+          if (!retryable) {
+            report.failed.push({ trackId: track.id, error: describeDownloadError(err) });
             break;
           }
-          await sleep(RETRY_DELAYS_MS[attempt]!);
+          await wait(RETRY_DELAYS_MS[attempt]!);
+          if (signal.aborted || fatal) {
+            report.paused = signal.aborted;
+            return;
+          }
           const part = `${files.musicDir}/${track.id}.part`;
           if (files.exists(part)) files.remove(part);
           store.removePartial(track.id);

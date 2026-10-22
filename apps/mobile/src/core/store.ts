@@ -29,6 +29,9 @@ const SCHEMA = `
 
 /** Todo lo que el celular guarda: servidor vinculado, catálogo, selección y descargas. */
 export class LocalStore {
+  /** Catálogo ya parseado (undefined = todavía no se leyó de la base). */
+  private cachedCatalog: { catalog: Catalog; etag: string } | null | undefined;
+
   constructor(private readonly db: SqlDb) {
     db.exec(SCHEMA);
   }
@@ -54,16 +57,23 @@ export class LocalStore {
     this.db.run('UPDATE server SET url = ? WHERE id = 1', url);
   }
 
-  /** Desvincula: borra servidor, catálogo, selección, parciales y fallas; conserva lo descargado. */
+  /**
+   * Desvincula: borra servidor, catálogo, parciales y fallas. Conserva lo descargado y la selección,
+   * así volver a vincular el mismo servidor no borra la biblioteca.
+   */
   clearServer(): void {
-    this.db.exec(
-      'DELETE FROM server; DELETE FROM catalog; DELETE FROM selection; DELETE FROM partials; DELETE FROM failures;',
-    );
+    this.db.exec('DELETE FROM server; DELETE FROM catalog; DELETE FROM partials; DELETE FROM failures;');
+    this.cachedCatalog = null;
   }
 
   getCatalog(): { catalog: Catalog; etag: string } | null {
-    const row = this.db.first<{ json: string; etag: string }>('SELECT json, etag FROM catalog WHERE id = 1');
-    return row ? { catalog: JSON.parse(row.json) as Catalog, etag: row.etag } : null;
+    if (this.cachedCatalog === undefined) {
+      const row = this.db.first<{ json: string; etag: string }>(
+        'SELECT json, etag FROM catalog WHERE id = 1',
+      );
+      this.cachedCatalog = row ? { catalog: JSON.parse(row.json) as Catalog, etag: row.etag } : null;
+    }
+    return this.cachedCatalog;
   }
 
   setCatalog(catalog: Catalog, etag: string): void {
@@ -72,6 +82,7 @@ export class LocalStore {
       JSON.stringify(catalog),
       etag,
     );
+    this.cachedCatalog = { catalog, etag };
   }
 
   getSelection(): Selection[] {

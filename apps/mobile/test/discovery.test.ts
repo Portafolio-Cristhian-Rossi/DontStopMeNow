@@ -6,14 +6,14 @@ const server = { serverId: 'srv', name: 'PC', url: 'http://192.168.1.10:4747', t
 
 describe('resolveServerUrl', () => {
   it('usa la URL guardada si responde', async () => {
-    const discovery = { find: vi.fn() };
+    const discovery = { find: vi.fn(), list: vi.fn() };
     const fetch = fakeFetch({ 'GET http://192.168.1.10:4747/api/catalog': { status: 401 } });
     expect(await resolveServerUrl(server, { fetch, discovery })).toBe(server.url);
     expect(discovery.find).not.toHaveBeenCalled();
   });
 
   it('usa mDNS cuando cambió la IP', async () => {
-    const discovery = { find: vi.fn(async () => 'http://192.168.1.77:4747') };
+    const discovery = { find: vi.fn(async () => 'http://192.168.1.77:4747'), list: vi.fn() };
     const fetch = fakeFetch({
       'GET http://192.168.1.10:4747/api/catalog': 'fail',
       'GET http://192.168.1.77:4747/api/catalog': { status: 401 },
@@ -23,7 +23,7 @@ describe('resolveServerUrl', () => {
   });
 
   it('null si no lo encuentra', async () => {
-    const discovery = { find: vi.fn(async () => null) };
+    const discovery = { find: vi.fn(async () => null), list: vi.fn() };
     expect(await resolveServerUrl(server, { fetch: fakeFetch({}), discovery })).toBeNull();
   });
 });

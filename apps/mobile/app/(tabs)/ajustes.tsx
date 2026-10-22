@@ -14,8 +14,7 @@ export default function Ajustes() {
         text: 'Desvincular',
         style: 'destructive',
         onPress: () => {
-          unpair();
-          router.replace('/vincular');
+          void unpair().then(() => router.replace('/vincular'));
         },
       },
     ]);
@@ -27,7 +26,7 @@ export default function Ajustes() {
       `Se liberan ${formatBytes(used)}. Podés volver a bajarlo después.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Borrar', style: 'destructive', onPress: deleteAllDownloads },
+        { text: 'Borrar', style: 'destructive', onPress: () => void deleteAllDownloads() },
       ],
     );
   }

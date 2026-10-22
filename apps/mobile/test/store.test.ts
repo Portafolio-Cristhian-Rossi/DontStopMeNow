@@ -50,7 +50,7 @@ describe('LocalStore', () => {
     expect(store.getFailures()).toEqual([]);
   });
 
-  it('clearServer conserva las descargas', () => {
+  it('clearServer conserva las descargas y la selección', () => {
     const store = new LocalStore(sqliteDb());
     store.setServer(server);
     store.setCatalog(makeCatalog(), '"1"');
@@ -59,7 +59,7 @@ describe('LocalStore', () => {
     store.clearServer();
     expect(store.getServer()).toBeNull();
     expect(store.getCatalog()).toBeNull();
-    expect(store.getSelection()).toEqual([]);
+    expect(store.getSelection()).toEqual([{ kind: 'album', id: 'al1' }]);
     expect(store.getDownloads()).toHaveLength(1);
   });
 

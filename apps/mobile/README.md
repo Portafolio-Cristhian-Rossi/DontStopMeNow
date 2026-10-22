@@ -39,6 +39,11 @@ Al terminar, EAS muestra un link y un código QR: abrilo desde el celular, desca
       sin borrar lo descargado.
 - [ ] Cambiar la IP de la compu (reiniciar el router o cambiar de red) y sincronizar: la encuentra sola.
 - [ ] Modo avión: la biblioteca descargada se sigue viendo.
+- [ ] Suspender o apagar la compu a mitad de una sincronización: la app avisa que no encuentra el servidor (no
+      se queda "Bajando…" para siempre).
+- [ ] Dejar el celular sin tocar durante una sincronización larga: la pantalla no se apaga y sigue bajando.
+- [ ] Desvincular y volver a vincular el mismo servidor: lo descargado se conserva.
+- [ ] Con una biblioteca grande, la pantalla Descargas responde fluida al marcar y desmarcar.
 
 ## Desarrollo
 

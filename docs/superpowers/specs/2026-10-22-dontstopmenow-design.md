@@ -206,7 +206,7 @@ Los artistas no viajan aparte: la web y el celular los derivan de `albums` y `tr
 ### 5.5 QR de vinculación
 
 El QR contiene JSON: `{ "v": 1, "serverId", "urls": ["http://192.168.x.y:4747", ...], "code" }`
-con todas las IPv4 privadas de la compu. El celular prueba las URLs en orden.
+con todas las IPv4 privadas de la compu. El celular prueba las URLs en paralelo y usa la primera que responde.
 
 ## 6. Sincronización
 
@@ -216,6 +216,7 @@ con todas las IPv4 privadas de la compu. El celular prueba las URLs en orden.
 server       (server_id, name, last_url, token)
 catalog      último catálogo recibido, como JSON en una fila (con su ETag)
 partials     estado de pausa de descargas a medio terminar (para retomarlas)
+failures     canciones que fallaron en la última sincronización
 selection    (kind: 'album'|'playlist', id)
 downloads    (track_id, fingerprint, local_path, size)
 player_state (queue, index, position_ms, repeat, shuffle)

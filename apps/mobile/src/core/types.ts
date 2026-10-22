@@ -15,6 +15,8 @@ export interface PairedServer {
 /** Búsqueda del servidor en la red local por mDNS. Devuelve `http://<ipv4>:<puerto>` o null. */
 export interface Discovery {
   find(serverId: string, timeoutMs: number): Promise<string | null>;
+  /** Servidores DontStopMeNow que se anuncian en la red durante `timeoutMs`. */
+  list(timeoutMs: number): Promise<{ serverId: string; name: string; url: string }[]>;
 }
 
 export type SqlValue = string | number | null;

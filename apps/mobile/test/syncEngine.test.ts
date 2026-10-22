@@ -154,9 +154,9 @@ describe('runSync', () => {
     s.store.setSelected({ kind: 'album', id: 'al1' }, true);
     const report = await s.run();
     expect(s.sleep.mock.calls.map((c) => c[0])).toEqual([2000, 4000, 8000]);
-    expect(report.failed).toEqual([{ trackId: 't1', error: 'Falla de red' }]);
+    expect(report.failed).toEqual([{ trackId: 't1', error: 'Se cortó la descarga' }]);
     expect(report.downloaded).toBe(1);
-    expect(s.store.getFailures()).toEqual([{ trackId: 't1', error: 'Falla de red' }]);
+    expect(s.store.getFailures()).toEqual([{ trackId: 't1', error: 'Se cortó la descarga' }]);
   });
 
   it('servidor caído a mitad: frena y conserva lo ya bajado', async () => {
