@@ -1,7 +1,14 @@
 import type { Catalog, LocalDownload, Selection } from '@dsmn/shared';
+import type { QueueState } from './player/queue.ts';
 import type { PairedServer, SqlDb } from './types.ts';
 
 export type StoredDownload = LocalDownload & { path: string; size: number };
+
+/** Estado del reproductor para retomar donde se dejó. */
+export interface SavedPlayerState {
+  queue: QueueState;
+  positionMs: number;
+}
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS server (
@@ -21,6 +28,10 @@ const SCHEMA = `
   );
   CREATE TABLE IF NOT EXISTS partials (
     track_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, state TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS player_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    json TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS failures (
     track_id TEXT PRIMARY KEY, error TEXT NOT NULL
@@ -161,5 +172,15 @@ export class LocalStore {
     this.db.run('DELETE FROM failures');
     for (const f of failures)
       this.db.run('INSERT OR REPLACE INTO failures (track_id, error) VALUES (?, ?)', f.trackId, f.error);
+  }
+
+  getPlayerState(): SavedPlayerState | null {
+    const row = this.db.first<{ json: string }>('SELECT json FROM player_state WHERE id = 1');
+    return row ? (JSON.parse(row.json) as SavedPlayerState) : null;
+  }
+
+  setPlayerState(state: SavedPlayerState | null): void {
+    if (state === null) this.db.run('DELETE FROM player_state');
+    else this.db.run('INSERT OR REPLACE INTO player_state (id, json) VALUES (1, ?)', JSON.stringify(state));
   }
 }
