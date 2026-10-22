@@ -17,4 +17,10 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ DSMN_PORT: 'abc' }, 'linux', '/h')).toThrow(/DSMN_PORT/);
     expect(() => loadConfig({ DSMN_PORT: '70000' }, 'linux', '/h')).toThrow(/DSMN_PORT/);
   });
+
+  it('webDir es null si no hay index.html', () => {
+    expect(loadConfig({}, 'linux', '/h', () => false).webDir).toBeNull();
+    expect(loadConfig({ DSMN_WEB_DIR: '/w' }, 'linux', '/h', () => true).webDir).toBe('/w');
+    expect(loadConfig({}, 'linux', '/h', () => true).webDir).toMatch(/web[\\/]dist$/);
+  });
 });

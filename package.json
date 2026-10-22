@@ -10,6 +10,8 @@
     "apps/*"
   ],
   "scripts": {
+    "build": "npm run build -w @dsmn/web",
+    "start": "npm run build && npm start -w @dsmn/server",
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
