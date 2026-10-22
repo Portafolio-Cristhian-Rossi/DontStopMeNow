@@ -81,4 +81,46 @@ export const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  // 2: descargas desde YouTube (solo tablas nuevas).
+  `
+  CREATE TABLE yt_sources (
+    id INTEGER PRIMARY KEY,
+    url TEXT NOT NULL,
+    yt_playlist_id TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    root_id INTEGER NOT NULL REFERENCES roots (id) ON DELETE CASCADE,
+    folder_rel_path TEXT NOT NULL,
+    playlist_id TEXT REFERENCES playlists (id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    last_checked_at INTEGER
+  );
+
+  CREATE TABLE yt_jobs (
+    id INTEGER PRIMARY KEY,
+    source_id INTEGER REFERENCES yt_sources (id) ON DELETE SET NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    root_id INTEGER NOT NULL REFERENCES roots (id) ON DELETE CASCADE,
+    folder_rel_path TEXT NOT NULL,
+    number_width INTEGER NOT NULL DEFAULT 2,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'paused', 'done', 'cancelled')),
+    pause_reason TEXT,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER
+  );
+  CREATE INDEX yt_jobs_status ON yt_jobs (status);
+
+  CREATE TABLE yt_items (
+    job_id INTEGER NOT NULL REFERENCES yt_jobs (id) ON DELETE CASCADE,
+    video_id TEXT NOT NULL,
+    position INTEGER,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'downloading', 'done', 'failed', 'cancelled')),
+    error TEXT,
+    file_path TEXT,
+    PRIMARY KEY (job_id, video_id)
+  );
+  CREATE INDEX yt_items_job ON yt_items (job_id);
+  `,
 ];
