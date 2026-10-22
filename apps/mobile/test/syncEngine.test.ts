@@ -133,6 +133,11 @@ describe('runSync', () => {
     expect(second.paused).toBe(false);
     const resumed = s.downloader.calls.filter((c) => c.url === URL('t1')).at(-1);
     expect(resumed?.resumeState).toBe(`estado-${URL('t1')}`);
+    // Al retomar se manda If-Range: si el archivo cambió en la compu, el servidor responde el archivo completo.
+    expect(resumed?.headers).toEqual({
+      Authorization: 'Bearer tok',
+      'If-Range': `"${s.catalog.tracks[0]!.fingerprint}"`,
+    });
     expect(s.store.getPartial('t1')).toBeNull();
   });
 

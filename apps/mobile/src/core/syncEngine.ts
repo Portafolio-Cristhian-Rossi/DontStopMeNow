@@ -114,7 +114,10 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
   async function downloadOnce(track: Track, part: string, resumeState: string | undefined) {
     const result = await downloader.download({
       url: client.trackUrl(track.id),
-      headers: client.authHeaders(),
+      // Al retomar, If-Range hace que el servidor mande el archivo completo si cambió en la compu.
+      headers: resumeState
+        ? { ...client.authHeaders(), 'If-Range': `"${track.fingerprint}"` }
+        : client.authHeaders(),
       dest: part,
       resumeState,
       signal,
