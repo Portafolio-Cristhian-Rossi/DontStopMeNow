@@ -43,8 +43,11 @@ export function addRoot(db: DatabaseSync, bus: EventBus, absPath: string): Root 
 }
 
 export function removeRoot(db: DatabaseSync, bus: EventBus, id: number): void {
-  const r = db.prepare('DELETE FROM roots WHERE id = ?').run(id);
-  if (r.changes === 0) throw new HttpError(404, 'not_found', 'Carpeta raíz inexistente');
+  const root = db.prepare('SELECT path FROM roots WHERE id = ?').get(id) as { path: string } | undefined;
+  if (!root) throw new HttpError(404, 'not_found', 'Carpeta raíz inexistente');
+  db.prepare('DELETE FROM roots WHERE id = ?').run(id);
+  const prefix = root.path.endsWith(path.sep) ? root.path : root.path + path.sep;
+  db.prepare('DELETE FROM scan_issues WHERE substr(path, 1, length(?)) = ?').run(prefix, prefix);
   refreshAlbums(db);
   bumpRevision(db, bus);
 }

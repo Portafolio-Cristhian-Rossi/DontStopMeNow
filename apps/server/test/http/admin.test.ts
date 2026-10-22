@@ -113,6 +113,14 @@ describe('rutas de gestión', () => {
     expect(r.expiresAt).toBeGreaterThan(Date.now());
   });
 
+  it('pairing-code sin red local → 409', async () => {
+    const { app, deps } = await makeApp();
+    deps.lanUrls = () => [];
+    const r = await app.inject({ method: 'POST', url: '/api/admin/pairing-code' });
+    expect(r.statusCode).toBe(409);
+    expect(r.json().error.message).toBe('La compu no está conectada a una red local');
+  });
+
   it('revocar dispositivo', async () => {
     const { app, deps } = await makeApp();
     const { deviceId } = deps.pairing.redeem(deps.pairing.createCode().code, 'Pixel')!;

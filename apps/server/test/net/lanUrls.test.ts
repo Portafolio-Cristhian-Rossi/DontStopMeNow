@@ -16,4 +16,11 @@ describe('getLanUrls', () => {
       }),
     ).toEqual(['http://192.168.1.20:4747', 'http://10.0.0.5:4747', 'http://172.20.1.1:4747']);
   });
+
+  it('sin IPs privadas usa cualquier IPv4 no interna salvo link-local', () => {
+    expect(
+      getLanUrls(4747, { eth: [iface('100.64.0.2', 'IPv4', false), iface('169.254.3.4', 'IPv4', false)] }),
+    ).toEqual(['http://100.64.0.2:4747']);
+    expect(getLanUrls(4747, { lo: [iface('127.0.0.1', 'IPv4', true)] })).toEqual([]);
+  });
 });

@@ -1,4 +1,4 @@
-import { rename, writeFile } from 'node:fs/promises';
+import { rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -82,6 +82,15 @@ describe('scanner', () => {
     expect(count('SELECT COUNT(*) AS n FROM scan_issues')).toBe(1);
     await writeFile(join(dir, 'g.mp3'), full);
     expect(await scanner.scanAll()).toMatchObject({ added: 1, issues: 0 });
+    expect(count('SELECT COUNT(*) AS n FROM scan_issues')).toBe(0);
+  });
+
+  it('limpia problemas de archivos que ya no existen', async () => {
+    const dir = await makeLibrary({ 'roto.mp3': enc('no es audio'), 'ok.mp3': makeMp3({}) });
+    addRootRow(db, dir);
+    expect((await scanner.scanAll()).issues).toBe(1);
+    await rm(join(dir, 'roto.mp3'));
+    await scanner.scanAll();
     expect(count('SELECT COUNT(*) AS n FROM scan_issues')).toBe(0);
   });
 
