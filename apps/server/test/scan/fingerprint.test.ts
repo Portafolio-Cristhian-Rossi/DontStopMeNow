@@ -10,7 +10,7 @@ describe('fingerprintFile', () => {
     const b = await fingerprintFile(await writeTmp('b.bin', data), data.length);
     expect(a).toBe(b);
     const changed = Buffer.from(data);
-    changed[changed.length - 1] ^= 0xff;
+    changed.writeUInt8(changed.readUInt8(changed.length - 1) ^ 0xff, changed.length - 1);
     expect(await fingerprintFile(await writeTmp('c.bin', changed), changed.length)).not.toBe(a);
   });
 
