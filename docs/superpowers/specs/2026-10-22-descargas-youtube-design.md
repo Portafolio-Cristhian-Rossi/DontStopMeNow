@@ -167,13 +167,13 @@ canción. Para cada entrada:
 
 Clave de canción = título limpio + etiquetas. Resultado por entrada:
 
-| Marca               | Regla                                                                                                                  | Casilla por defecto  |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `duplicateOf`       | Misma clave que una entrada anterior del link, y los artistas no se contradicen (si los dos tienen artista, coinciden) | desmarcada           |
-| `inLibrary`         | Misma clave y mismo artista que una canción de la biblioteca (sin artista no se compara)                               | desmarcada           |
-| `versionGroup`      | Mismo título limpio que otra entrada pero con etiquetas distintas                                                      | sin cambio           |
-| `alreadyDownloaded` | (solo en "Buscar nuevas") el video ya se bajó de esa playlist                                                          | desmarcada, plegada  |
-| `unavailable`       | yt-dlp lo marca privado o borrado                                                                                      | desmarcada, inactiva |
+| Marca               | Regla                                                                                                                                                                              | Casilla por defecto  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `duplicateOf`       | Misma clave que una entrada anterior del link, y los artistas no se contradicen (solo contradicen si los dos salen del título "Artista - Canción" y difieren; el canal no alcanza) | desmarcada           |
+| `inLibrary`         | Misma clave y mismo artista que una canción de la biblioteca (sin artista no se compara)                                                                                           | desmarcada           |
+| `versionGroup`      | Mismo título limpio que otra entrada pero con etiquetas distintas                                                                                                                  | sin cambio           |
+| `alreadyDownloaded` | (solo en "Buscar nuevas") el video ya se bajó de esa playlist                                                                                                                      | desmarcada, plegada  |
+| `unavailable`       | yt-dlp lo marca privado o borrado                                                                                                                                                  | desmarcada, inactiva |
 
 El resto viene marcado. El usuario puede cambiar cualquier casilla salvo las de videos no disponibles.
 
