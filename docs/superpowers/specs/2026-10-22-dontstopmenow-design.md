@@ -164,12 +164,12 @@ Todos los cuerpos se validan con los esquemas zod de `packages/shared`.
 
 ### 5.2 Rutas de dispositivo
 
-| Método y ruta              | Descripción                                                                                                 |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `POST /api/pair`           | `{ code, deviceName }` → `{ token, serverId, serverName }`. El código es de un solo uso y vence a los 5 min |
-| `GET /api/catalog`         | Catálogo completo (ver 5.4). Soporta `ETag` = revisión → `304` si no cambió                                 |
-| `GET /api/tracks/:id/file` | Archivo de audio original; soporta `Range` (para retomar descargas). `409` si la raíz está offline          |
-| `GET /api/covers/:id`      | Imagen de portada                                                                                           |
+| Método y ruta              | Descripción                                                                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/pair`           | `{ code, deviceName }` → `{ token, serverId, serverName }`. El código es de un solo uso y vence a los 5 min                                                                                                     |
+| `GET /api/catalog`         | Catálogo completo (ver 5.4). Soporta `ETag` = revisión → `304` si no cambió                                                                                                                                     |
+| `GET /api/tracks/:id/file` | Archivo de audio original; soporta `Range` (para retomar descargas). `409` si la raíz está offline; envía `ETag: "<fingerprint>"` y respeta `If-Range` (si no coincide, responde `200` con el archivo completo) |
+| `GET /api/covers/:id`      | Imagen de portada                                                                                                                                                                                               |
 
 ### 5.3 Rutas de gestión (`/api/admin`, solo localhost)
 
@@ -239,7 +239,7 @@ player_state (queue, index, position_ms, repeat, shuffle)
 - Se aplican primero los borrados (excepto la canción que está sonando, que queda para
   la próxima sincronización) y después las descargas.
 - Descargas: 2 en paralelo. Cada una escribe en `<id>.part`; si ya existe, retoma con
-  `Range: bytes=<tamaño>-`. Al terminar, verifica el tamaño, renombra a `<id>.<ext>` y
+  `Range: bytes=<tamaño>-` e `If-Range: "<fingerprint>"` (si el archivo cambió en la compu, el servidor responde `200` y se reescribe desde cero). Al terminar, verifica el tamaño, renombra a `<id>.<ext>` y
   registra en `downloads`.
 - Error de red o 5xx: hasta 3 reintentos con espera creciente (2 s, 4 s, 8 s). Si sigue
   fallando, se marca la canción como fallida y se continúa; al final se muestra el resumen.

@@ -32,7 +32,7 @@ La interfaz web llega en la etapa 2. Mientras tanto, desde la misma compu:
 ```bash
 # Windows (PowerShell)
 Invoke-RestMethod -Method Post -Uri http://localhost:4747/api/admin/roots `
-  -ContentType 'application/json' -Body '{"path":"D:\\Música"}'
+  -ContentType 'application/json; charset=utf-8' -Body '{"path":"D:\\Música"}'
 
 # Linux / macOS
 curl -X POST localhost:4747/api/admin/roots -H 'content-type: application/json' -d '{"path":"/home/yo/Música"}'

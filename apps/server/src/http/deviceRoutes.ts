@@ -20,6 +20,7 @@ const CONTENT_TYPES: Record<AudioFormat, string> = {
 
 interface FileRow {
   rel_path: string;
+  fingerprint: string;
   format: AudioFormat;
   path: string;
   status: 'online' | 'offline';
@@ -48,7 +49,7 @@ export function deviceRoutes(app: FastifyInstance, deps: AppDeps): void {
     async (req, reply) => {
       const row = db
         .prepare(
-          `SELECT t.rel_path, t.format, r.path, r.status FROM tracks t JOIN roots r ON r.id = t.root_id
+          `SELECT t.rel_path, t.fingerprint, t.format, r.path, r.status FROM tracks t JOIN roots r ON r.id = t.root_id
            WHERE t.id = ?`,
         )
         .get(req.params.id) as FileRow | undefined;
@@ -62,8 +63,14 @@ export function deviceRoutes(app: FastifyInstance, deps: AppDeps): void {
         throw new HttpError(409, 'conflict', 'El archivo no está disponible ahora');
       }
 
-      reply.header('accept-ranges', 'bytes').header('content-type', CONTENT_TYPES[row.format]);
-      const range = parseRange(req.headers.range, size);
+      // La huella sirve de validador: con If-Range, el celular solo retoma si el archivo no cambió.
+      const etag = `"${row.fingerprint}"`;
+      reply
+        .header('accept-ranges', 'bytes')
+        .header('content-type', CONTENT_TYPES[row.format])
+        .header('etag', etag);
+      const ifRange = req.headers['if-range'];
+      const range = ifRange === undefined || ifRange === etag ? parseRange(req.headers.range, size) : null;
       if (range === 'invalid') {
         reply.header('content-range', `bytes */${size}`);
         throw new HttpError(416, 'range_not_satisfiable', 'Rango inválido');
