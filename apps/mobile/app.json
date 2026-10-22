@@ -13,8 +13,21 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
-      ["expo-camera", { "cameraPermission": "La cámara se usa para escanear el código QR del servidor." }],
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "La cámara se usa para escanear el código QR del servidor.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ]
   }
 }
