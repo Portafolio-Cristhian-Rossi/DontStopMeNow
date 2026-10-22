@@ -4,6 +4,7 @@ import type { Config } from '../config.ts';
 import type { EventBus } from '../events.ts';
 import type { Pairing } from '../pairing/pairing.ts';
 import type { Scanner } from '../scan/scanner.ts';
+import { adminRoutes } from './adminRoutes.ts';
 import { authHook } from './auth.ts';
 import { deviceRoutes } from './deviceRoutes.ts';
 import { errorHandler, notFoundHandler } from './errors.ts';
@@ -21,10 +22,16 @@ export interface AppDeps {
 }
 
 export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): FastifyInstance {
-  const app = Fastify({ logger: opts.logger ?? false, trustProxy: false });
+  const app = Fastify({
+    logger: opts.logger ?? false,
+    trustProxy: false,
+    // Las conexiones SSE no quedan nunca ociosas; sin esto app.close() esperaría para siempre.
+    forceCloseConnections: true,
+  });
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
   app.addHook('onRequest', authHook(deps.pairing));
   deviceRoutes(app, deps);
+  adminRoutes(app, deps);
   return app;
 }
