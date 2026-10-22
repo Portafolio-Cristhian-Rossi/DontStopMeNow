@@ -3,7 +3,7 @@ import { useCatalog } from '../api/queries.ts';
 import { AddToPlaylistDialog } from '../components/AddToPlaylistDialog.tsx';
 import { LibraryTabs } from '../components/LibraryTabs.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
-import { searchKey } from '../lib/search.ts';
+import { searchKey } from '@dsmn/shared';
 
 /** Más filas que esto vuelven lenta la página; se pide refinar la búsqueda. */
 const MAX_ROWS = 500;

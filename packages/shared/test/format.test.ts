@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes, formatDuration } from '../src/lib/format.ts';
+import { formatBytes, formatDuration } from '../src/format.ts';
 
 describe('format', () => {
   it.each([

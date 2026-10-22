@@ -23,7 +23,7 @@ import { api } from '../api/client.ts';
 import { queryKeys, useCatalog, useRoots } from '../api/queries.ts';
 import { displayPath } from '../components/FolderPicker.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
-import { formatDuration } from '../lib/format.ts';
+import { formatDuration } from '@dsmn/shared';
 
 interface RowProps {
   id: string;

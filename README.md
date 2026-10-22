@@ -1,8 +1,8 @@
 # DontStopMeNow
 
 Tu propio ecosistema de música: un servidor en la compu que organiza tu biblioteca a partir de la metadata
-de los archivos, y una app Android (en desarrollo) que sincroniza los álbumes y listas que elijas para
-escucharlos sin conexión.
+de los archivos, y una app Android que sincroniza los álbumes y listas que elijas para escucharlos sin
+conexión.
 
 ## Cómo se usa
 
@@ -24,6 +24,11 @@ de la misma compu:
 4. **Dispositivos:** el código QR para vincular el celular.
 
 En Windows, la primera vez que arranca, aceptá el permiso de red para **redes privadas**.
+
+### La app del celular
+
+Se compila con EAS (en la nube) y se instala como APK: los pasos están en
+[apps/mobile/README.md](apps/mobile/README.md).
 
 ## Estructura
 
