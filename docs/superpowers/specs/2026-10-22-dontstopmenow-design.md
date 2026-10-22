@@ -43,7 +43,7 @@ letras, estadísticas, transcodificación, cliente iOS.
 | Servidor          | Node 24 LTS + Fastify, nativo (sin Docker)                          | Docker Desktop en Windows rompe la detección de cambios en archivos y el mDNS; Node ya es multiplataforma |
 | Base del servidor | SQLite vía `node:sqlite`                                            | Un solo archivo, sin instalar nada                                                                        |
 | Web de gestión    | React + Vite, servida por el propio servidor                        | Sin app de escritorio aparte                                                                              |
-| App móvil         | Expo (React Native) + `react-native-track-player`                   | Un solo lenguaje; reproductor con soporte de segundo plano sobre Media3/ExoPlayer                         |
+| App móvil         | Expo (React Native) + `expo-audio`                                  | Un solo lenguaje; reproductor del SDK de Expo (Media3/ExoPlayer) con cola nativa y segundo plano          |
 | Organización      | Biblioteca por metadata; carpetas ignoradas salvo listas de carpeta | Así organiza el usuario                                                                                   |
 | Docker            | `Dockerfile` opcional para Linux, en la etapa de empaquetado        | Portabilidad sin depender de Docker en Windows                                                            |
 
@@ -254,6 +254,8 @@ player_state (queue, index, position_ms, repeat, shuffle)
   fallando, se marca la canción como fallida y se continúa; al final se muestra el resumen.
 - Si se pierde la conexión con el servidor, se detiene; lo ya bajado queda.
 - Archivos en el almacenamiento privado de la app (`documentDirectory/music/`).
+- Al terminar sin pausa ni errores, se bajan las portadas de lo descargado a `documentDirectory/covers/` y se
+  borran las que ya no se usan; la biblioteca y la pantalla de bloqueo las leen de ahí (se ven sin conexión).
 
 ### 6.4 Cuándo
 
@@ -279,11 +281,17 @@ Al abrir la app si el servidor responde, y con el botón "Sincronizar".
 Se guarda `serverId` y la última URL. Si la URL no responde, se busca por mDNS un
 servicio `_dontstopmenow._tcp` con ese `serverId` y se actualiza la URL.
 
-### 7.3 Reproductor (react-native-track-player)
+### 7.3 Reproductor (expo-audio)
+
+Se usa `AudioPlaylist` de expo-audio y no react-native-track-player: este último no publica versiones desde
+marzo de 2026 y su módulo es de la arquitectura vieja de React Native, que RN 0.88 ya no incluye. La cola es
+nativa (sigue avanzando en segundo plano sin depender de JS); el aleatorio se arma cargando la cola ya
+mezclada.
 
 - Reproducción en segundo plano; controles en notificación y pantalla de bloqueo.
 - Botones de auriculares/Bluetooth.
-- Foco de audio: pausa en llamadas, baja el volumen con notificaciones.
+- Foco de audio: pausa en llamadas. Con notificaciones de otras apps, expo-audio pausa un instante y retoma
+  (en lugar de bajar el volumen).
 - Pausa al desconectar auriculares.
 - Cola: reproducir álbum/lista reemplaza la cola; "Reproducir a continuación" y
   "Agregar a la cola".
