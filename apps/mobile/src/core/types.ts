@@ -32,7 +32,10 @@ export interface SqlDb {
 /** Archivos de la app (en el celular, el almacenamiento privado; en los tests, memoria). */
 export interface FileStore {
   musicDir: string;
+  coversDir: string;
   exists(path: string): boolean;
+  /** Nombres de los archivos de una carpeta. */
+  list(dir: string): string[];
   size(path: string): number;
   read(path: string, offset: number, length: number): Promise<Uint8Array>;
   move(from: string, to: string): void;

@@ -14,7 +14,13 @@ import { AppState } from 'react-native';
 import { resolveServerUrl } from '../core/discovery.ts';
 import { ServerUnreachableError, UnauthorizedError, createServerClient } from '../core/http.ts';
 import { LocalStore, type StoredDownload } from '../core/store.ts';
-import { InsufficientSpaceError, runSync, type SyncProgress, type SyncReport } from '../core/syncEngine.ts';
+import {
+  InsufficientSpaceError,
+  coverPath,
+  runSync,
+  type SyncProgress,
+  type SyncReport,
+} from '../core/syncEngine.ts';
 import type { Discovery, FetchLike, PairedServer } from '../core/types.ts';
 import { createDiscovery, createDownloader, createFileStore, openSqlDb } from '../native/index.ts';
 
@@ -40,6 +46,8 @@ export interface AppValue {
   online: boolean | null;
   discovery: Discovery;
   freeBytes(): number;
+  /** URI local de una portada, o null si no está en el celular. */
+  coverUri(coverId: string | null): string | null;
   pair(server: PairedServer): Promise<void>;
   unpair(): Promise<void>;
   toggle(sel: Selection): void;
@@ -183,6 +191,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       online,
       discovery: deps.discovery,
       freeBytes: () => files.freeBytes(),
+      coverUri: (coverId) => {
+        if (!coverId) return null;
+        const path = coverPath(files, coverId);
+        return files.exists(path) ? path : null;
+      },
       async pair(server) {
         await stopAndWait();
         store.setServer(server);

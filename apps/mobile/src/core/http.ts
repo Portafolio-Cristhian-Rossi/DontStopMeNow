@@ -62,6 +62,7 @@ export interface ServerClient {
     etag?: string,
   ): Promise<{ notModified: true } | { notModified: false; catalog: Catalog; etag: string }>;
   trackUrl(id: string): string;
+  coverUrl(id: string): string;
   authHeaders(): Record<string, string>;
 }
 
@@ -75,6 +76,7 @@ export function createServerClient(opts: {
   return {
     authHeaders,
     trackUrl: (id) => `${opts.baseUrl}/api/tracks/${encodeURIComponent(id)}/file`,
+    coverUrl: (id) => `${opts.baseUrl}/api/covers/${encodeURIComponent(id)}`,
     async catalog(etag) {
       const headers: Record<string, string> = authHeaders();
       if (etag) headers['If-None-Match'] = etag;

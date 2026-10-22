@@ -2,7 +2,7 @@ import type { Catalog } from '@dsmn/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { ServerUnreachableError, UnauthorizedError, type ServerClient } from '../src/core/http.ts';
 import { LocalStore } from '../src/core/store.ts';
-import { InsufficientSpaceError, runSync } from '../src/core/syncEngine.ts';
+import { InsufficientSpaceError, coverPath, runSync } from '../src/core/syncEngine.ts';
 import { fakeDownloader, memoryFiles, sqliteDb, trackFor, type Behavior } from './helpers.ts';
 
 const bytes = (n: number, seed: number) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) % 251);
@@ -26,6 +26,7 @@ function setup(
       return { notModified: false as const, catalog, etag: '"1"' };
     }),
     trackUrl: URL,
+    coverUrl: (id: string) => `http://srv/api/covers/${id}`,
     authHeaders: () => ({ Authorization: 'Bearer tok' }),
   };
   const store = new LocalStore(sqliteDb());
@@ -185,5 +186,46 @@ describe('runSync', () => {
     expect(last.phase).toBe('done');
     expect(last.bytesDone).toBe(last.bytesTotal);
     expect(last.bytesTotal).toBe(301_000);
+  });
+
+  it('baja las portadas de lo descargado y borra las que sobran', async () => {
+    const cover = new Uint8Array([7, 7, 7]);
+    const s = setup();
+    s.catalog.tracks[0]!.coverId = 'c1';
+    s.catalog.tracks[1]!.coverId = 'c1';
+    s.catalog.tracks[2]!.coverId = 'c3';
+    s.files.files.set('/covers/c9', new Uint8Array([9]));
+    const download = s.downloader.download.bind(s.downloader);
+    s.downloader.download = async (req) => {
+      if (req.url === 'http://srv/api/covers/c1') {
+        s.files.files.set(req.dest, cover);
+        return { status: 'done' };
+      }
+      return download(req);
+    };
+    s.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    const report = await s.run();
+    expect(report.failed).toEqual([]);
+    expect(s.files.files.get('/covers/c1')).toEqual(cover);
+    expect(s.files.exists('/covers/c9')).toBe(false);
+    expect(s.files.exists('/covers/c3')).toBe(false);
+    expect(coverPath(s.files, 'c1')).toBe('/covers/c1');
+  });
+
+  it('una portada que falla no afecta el resultado', async () => {
+    const s = setup({ behave: (url) => (url.includes('/api/covers/') ? 'fail' : undefined) });
+    s.catalog.tracks[0]!.coverId = 'c1';
+    s.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    const report = await s.run();
+    expect(report).toMatchObject({ downloaded: 2, failed: [] });
+    expect(s.sleep).not.toHaveBeenCalled();
+  });
+
+  it('no baja portadas si la sincronización quedó en pausa', async () => {
+    const s = setup({ behave: (url) => (url === URL('t1') ? 'pause' : undefined) });
+    s.catalog.tracks[1]!.coverId = 'c1';
+    s.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    await s.run();
+    expect(s.downloader.calls.some((c) => c.url.includes('/api/covers/'))).toBe(false);
   });
 });

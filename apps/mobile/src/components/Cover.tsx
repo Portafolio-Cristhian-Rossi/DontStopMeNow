@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../state/AppContext.tsx';
 
-/** Portada desde el servidor si hay conexión; si no, la inicial del título. */
+/** Portada guardada en el celular; si no está (o no carga), la inicial del título. */
 export function Cover({
   coverId,
   title,
@@ -11,18 +12,12 @@ export function Cover({
   title: string;
   size?: number;
 }) {
-  const { server, online } = useApp();
+  const { coverUri } = useApp();
+  const [failed, setFailed] = useState(false);
+  const uri = coverUri(coverId);
   const box = { width: size, height: size, borderRadius: size / 8 };
-  if (coverId && server && online) {
-    return (
-      <Image
-        style={[styles.base, box]}
-        source={{
-          uri: `${server.url}/api/covers/${encodeURIComponent(coverId)}`,
-          headers: { Authorization: `Bearer ${server.token}` },
-        }}
-      />
-    );
+  if (uri && !failed) {
+    return <Image style={[styles.base, box]} source={{ uri }} onError={() => setFailed(true)} />;
   }
   return (
     <View style={[styles.base, box]}>

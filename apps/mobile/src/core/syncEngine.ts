@@ -61,6 +61,11 @@ export function describeDownloadError(err: unknown): string {
   return 'Se cortó la descarga';
 }
 
+/** Dónde se guarda una portada en el celular. */
+export function coverPath(files: FileStore, coverId: string): string {
+  return `${files.coversDir}/${coverId}`;
+}
+
 async function fingerprintOf(files: FileStore, path: string): Promise<string> {
   const size = files.size(path);
   if (size <= 2 * FINGERPRINT_WINDOW)
@@ -244,10 +249,40 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
     }
   }
 
+  /**
+   * Portadas de lo descargado: baja las que faltan y borra las que ya no usa ninguna canción.
+   * Una portada que no baja no es una falla de la sincronización.
+   */
+  async function syncCovers() {
+    const downloaded = new Set(store.getDownloads().map((d) => d.trackId));
+    const needed = new Set(
+      catalog!.tracks.filter((t) => downloaded.has(t.id) && t.coverId).map((t) => t.coverId as string),
+    );
+    for (const id of needed) {
+      const dest = coverPath(files, id);
+      if (files.exists(dest) || signal.aborted) continue;
+      try {
+        await downloader.download({
+          url: client.coverUrl(id),
+          headers: client.authHeaders(),
+          dest,
+          signal,
+          onProgress: () => {},
+        });
+      } catch {
+        if (files.exists(dest)) files.remove(dest);
+      }
+    }
+    for (const name of files.list(files.coversDir)) {
+      if (!needed.has(name)) files.remove(`${files.coversDir}/${name}`);
+    }
+  }
+
   await Promise.all(Array.from({ length: PARALLEL_DOWNLOADS }, worker));
   if (fatal) throw fatal;
 
   store.setFailures(report.failed);
+  if (!report.paused) await syncCovers();
   emit({ phase: 'done', done, total: plan.download.length, bytesDone: bytesDone(), bytesTotal });
   return report;
 }

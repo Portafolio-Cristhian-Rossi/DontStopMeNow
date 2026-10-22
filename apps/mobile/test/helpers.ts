@@ -106,7 +106,10 @@ export function memoryFiles(
     files,
     free: freeBytes,
     musicDir: '/music',
+    coversDir: '/covers',
     exists: (p: string) => files.has(p),
+    list: (dir: string) =>
+      [...files.keys()].filter((p) => p.startsWith(`${dir}/`)).map((p) => p.slice(dir.length + 1)),
     size: (p: string) => files.get(p)?.length ?? 0,
     read: async (p: string, offset: number, length: number) =>
       (files.get(p) ?? new Uint8Array()).slice(offset, offset + length),

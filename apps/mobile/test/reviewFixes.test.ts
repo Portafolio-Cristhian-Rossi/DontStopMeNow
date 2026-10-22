@@ -24,6 +24,7 @@ function setup(behave?: (url: string, attempt: number) => Behavior) {
   const client: ServerClient = {
     catalog: vi.fn(async () => ({ notModified: false as const, catalog, etag: '"1"' })),
     trackUrl: URL,
+    coverUrl: (id: string) => `http://srv/api/covers/${id}`,
     authHeaders: () => ({ Authorization: 'Bearer tok' }),
   };
   const store = new LocalStore(sqliteDb());
