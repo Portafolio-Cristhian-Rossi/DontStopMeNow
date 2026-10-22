@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@dsmn/shared": "*"
+    "@dsmn/shared": "*",
+    "music-metadata": "^12.2.3"
   }
 }

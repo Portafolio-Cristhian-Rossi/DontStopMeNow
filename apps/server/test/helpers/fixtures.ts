@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -20,4 +20,11 @@ export async function tmpDir(): Promise<string> {
 
 export function makeDb(): DatabaseSync {
   return openDatabase(':memory:');
+}
+
+/** Escribe un archivo en una carpeta temporal nueva y devuelve su ruta. */
+export async function writeTmp(name: string, data: Uint8Array): Promise<string> {
+  const file = join(await tmpDir(), name);
+  await writeFile(file, data);
+  return file;
 }
