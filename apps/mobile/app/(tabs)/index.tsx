@@ -1,6 +1,5 @@
 import { Text, View } from 'react-native';
 import { SERVER_PORT } from '../../src/version.ts';
-import '../../src/native/index.ts';
 
 export default function Biblioteca() {
   return (
