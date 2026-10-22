@@ -57,3 +57,22 @@ export interface Downloader {
     signal: AbortSignal;
   }): Promise<{ status: 'done' } | { status: 'paused'; state: string }>;
 }
+
+export type EngineLoop = 'none' | 'single' | 'all';
+
+/** Motor de audio con cola nativa (en el celular, AudioPlaylist de expo-audio). */
+export interface PlayerEngine {
+  load(sources: { uri: string }[], startIndex: number, positionMs: number, autoplay: boolean): void;
+  play(): void;
+  pause(): void;
+  skipTo(index: number): void;
+  seekTo(ms: number): void;
+  setLoop(mode: EngineLoop): void;
+  insert(source: { uri: string }, index: number): void;
+  add(source: { uri: string }): void;
+  remove(index: number): void;
+  setNowPlaying(meta: { title: string; artist: string; albumTitle: string; artworkUrl?: string }): void;
+  status(): { index: number; positionMs: number; durationMs: number; playing: boolean };
+  onTrackChanged(cb: (index: number) => void): () => void;
+  onStatus(cb: () => void): () => void;
+}
