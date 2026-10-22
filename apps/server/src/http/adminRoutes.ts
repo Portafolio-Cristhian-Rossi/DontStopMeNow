@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { getRevision } from '../db/meta.ts';
 import type { BusEvents } from '../events.ts';
 import { createPlaylist, deletePlaylist, updatePlaylist } from '../library/playlists.ts';
-import { addRoot, browse, listRoots, removeRoot } from '../library/roots.ts';
+import { addRoot, browse, listFolders, listPlaces, listRoots, removeRoot } from '../library/roots.ts';
 import type { AppDeps } from './app.ts';
 import { HttpError, parseBody } from './errors.ts';
 
@@ -51,6 +51,12 @@ export function adminRoutes(app: FastifyInstance, deps: AppDeps): void {
 
   app.get<{ Querystring: { rootId?: string; path?: string } }>('/api/admin/browse', admin, async (req) =>
     browse(db, intParam(req.query.rootId, 'rootId'), req.query.path ?? ''),
+  );
+
+  app.get('/api/admin/fs/places', admin, async () => listPlaces());
+
+  app.get<{ Querystring: { path?: string } }>('/api/admin/fs', admin, async (req) =>
+    listFolders(req.query.path ?? ''),
   );
 
   app.post('/api/admin/scan', admin, async (_req, reply) => {

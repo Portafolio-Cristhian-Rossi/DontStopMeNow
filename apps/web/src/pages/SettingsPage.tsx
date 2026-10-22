@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { api } from '../api/client.ts';
 import { useScanStatus } from '../api/events.ts';
 import { queryKeys, useIssues, useRoots } from '../api/queries.ts';
+import { SystemFolderDialog } from '../components/SystemFolderDialog.tsx';
 
 /** Limpia una ruta pegada desde el Explorador: espacios y comillas en los extremos. */
 export function cleanPath(input: string): string {
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const [path, setPath] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   async function act(action: () => Promise<unknown>) {
     setBusy(true);
@@ -43,6 +45,15 @@ export function SettingsPage() {
     const cleaned = cleanPath(path);
     if (!cleaned) return;
     if (await act(() => api.addRoot(cleaned))) setPath('');
+  }
+
+  async function addPicked(picked: string) {
+    if (await act(() => api.addRoot(picked))) setPicking(false);
+  }
+
+  function openPicker() {
+    setError(null);
+    setPicking(true);
   }
 
   function remove(id: number, rootPath: string) {
@@ -91,6 +102,10 @@ export function SettingsPage() {
         <p className="muted">Todavía no agregaste ninguna carpeta.</p>
       )}
       <form className="toolbar" onSubmit={add} style={{ marginTop: '1rem' }}>
+        <button type="button" className="primary" disabled={busy} onClick={openPicker}>
+          Examinar…
+        </button>
+        <span className="muted">o pegá la ruta:</span>
         <input
           type="text"
           aria-label="Ruta de la carpeta"
@@ -98,11 +113,19 @@ export function SettingsPage() {
           value={path}
           onChange={(e) => setPath(e.target.value)}
         />
-        <button type="submit" className="primary" disabled={busy || !cleanPath(path)}>
+        <button type="submit" disabled={busy || !cleanPath(path)}>
           Agregar carpeta
         </button>
       </form>
-      {error && <p className="error">{error}</p>}
+      {error && !picking && <p className="error">{error}</p>}
+      {picking && (
+        <SystemFolderDialog
+          busy={busy}
+          error={error}
+          onPick={(picked) => void addPicked(picked)}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       <h2>Escaneo</h2>
       <div className="toolbar">

@@ -1,8 +1,18 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
 import { FakeEventSource, callsTo, fakeServer, makeCatalog, renderWithProviders } from './utils.tsx';
+
+const FS: Record<string, unknown> = {
+  'C:\\Users\\yo\\Music': {
+    path: 'C:\\Users\\yo\\Music',
+    parent: 'C:\\Users\\yo',
+    folders: [{ name: 'Discos', path: 'C:\\Users\\yo\\Music\\Discos' }],
+  },
+  'D:\\': { path: 'D:\\', parent: null, folders: [{ name: 'Rock', path: 'D:\\Rock' }] },
+  'D:\\Rock': { path: 'D:\\Rock', parent: 'D:\\', folders: [] },
+};
 
 function setup(overrides: Record<string, (body: unknown) => unknown> = {}) {
   const server = fakeServer({
@@ -17,6 +27,11 @@ function setup(overrides: Record<string, (body: unknown) => unknown> = {}) {
     'POST /api/admin/roots': (body) => ({ id: 3, path: (body as { path: string }).path, status: 'online' }),
     'DELETE /api/admin/roots/1': () => undefined,
     'POST /api/admin/scan': () => new Response(JSON.stringify({ started: true }), { status: 202 }),
+    'GET /api/admin/fs/places': () => [
+      { name: 'Música', path: 'C:\\Users\\yo\\Music' },
+      { name: 'D:', path: 'D:\\' },
+    ],
+    'GET /api/admin/fs': (_body, url) => FS[url.searchParams.get('path') ?? ''],
     ...overrides,
   });
   renderWithProviders(<App />, { route: '/ajustes' });
@@ -56,6 +71,36 @@ describe('ajustes', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Agregar carpeta' }));
     expect(await screen.findByText('Se superpone con la carpeta ya agregada D:\\Música')).toBeInTheDocument();
+  });
+
+  it('examinar: navega desde los accesos rápidos y agrega la carpeta elegida', async () => {
+    const server = setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Examinar…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Elegí la carpeta de música' });
+    expect(await within(dialog).findByText('C:\\Users\\yo\\Music')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'D:' }));
+    await userEvent.click(await within(dialog).findByRole('button', { name: '📁 Rock' }));
+    expect(await within(dialog).findByText('Sin subcarpetas')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Usar esta carpeta' }));
+    expect(callsTo(server, 'POST', '/api/admin/roots')[0]?.body).toEqual({ path: 'D:\\Rock' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('examinar: el error al agregar se muestra en el diálogo', async () => {
+    setup({
+      'POST /api/admin/roots': () =>
+        new Response(
+          JSON.stringify({ error: { code: 'conflict', message: 'Se superpone con D:\\Música' } }),
+          { status: 409 },
+        ),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Examinar…' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('📁 Discos');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Usar esta carpeta' }));
+    expect(await within(dialog).findByText('Se superpone con D:\\Música')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('quita una carpeta tras confirmar', async () => {
