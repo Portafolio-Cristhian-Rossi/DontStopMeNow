@@ -35,17 +35,17 @@ letras, estadísticas, transcodificación, cliente iOS.
 
 ## 2. Decisiones tomadas
 
-| Tema | Decisión | Motivo |
-|---|---|---|
-| Modelo | Sincronización (descarga) + reproducción offline | Escuchar fuera de casa |
-| Plataforma móvil | Android | Teléfono del usuario |
-| Lenguaje | TypeScript en las tres partes | Objetivo de aprender Node/React; tipos compartidos |
-| Servidor | Node 24 LTS + Fastify, nativo (sin Docker) | Docker Desktop en Windows rompe la detección de cambios en archivos y el mDNS; Node ya es multiplataforma |
-| Base del servidor | SQLite vía `node:sqlite` | Un solo archivo, sin instalar nada |
-| Web de gestión | React + Vite, servida por el propio servidor | Sin app de escritorio aparte |
-| App móvil | Expo (React Native) + `react-native-track-player` | Un solo lenguaje; reproductor con soporte de segundo plano sobre Media3/ExoPlayer |
-| Organización | Biblioteca por metadata; carpetas ignoradas salvo listas de carpeta | Así organiza el usuario |
-| Docker | `Dockerfile` opcional para Linux, en la etapa de empaquetado | Portabilidad sin depender de Docker en Windows |
+| Tema              | Decisión                                                            | Motivo                                                                                                    |
+| ----------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Modelo            | Sincronización (descarga) + reproducción offline                    | Escuchar fuera de casa                                                                                    |
+| Plataforma móvil  | Android                                                             | Teléfono del usuario                                                                                      |
+| Lenguaje          | TypeScript en las tres partes                                       | Objetivo de aprender Node/React; tipos compartidos                                                        |
+| Servidor          | Node 24 LTS + Fastify, nativo (sin Docker)                          | Docker Desktop en Windows rompe la detección de cambios en archivos y el mDNS; Node ya es multiplataforma |
+| Base del servidor | SQLite vía `node:sqlite`                                            | Un solo archivo, sin instalar nada                                                                        |
+| Web de gestión    | React + Vite, servida por el propio servidor                        | Sin app de escritorio aparte                                                                              |
+| App móvil         | Expo (React Native) + `react-native-track-player`                   | Un solo lenguaje; reproductor con soporte de segundo plano sobre Media3/ExoPlayer                         |
+| Organización      | Biblioteca por metadata; carpetas ignoradas salvo listas de carpeta | Así organiza el usuario                                                                                   |
+| Docker            | `Dockerfile` opcional para Linux, en la etapa de empaquetado        | Portabilidad sin depender de Docker en Windows                                                            |
 
 ## 3. Arquitectura
 
@@ -65,16 +65,16 @@ DontStopMeNow/                (monorepo, npm workspaces)
 
 ### 3.1 Unidades del servidor
 
-| Unidad | Responsabilidad | Depende de |
-|---|---|---|
-| `scanner` | Recorre carpetas raíz, lee metadata (`music-metadata`), calcula huellas, detecta movimientos, actualiza la base | `db`, `covers` |
-| `watcher` | Observa las raíces con `chokidar`, agrupa eventos (debounce ~2 s) y pide al `scanner` un escaneo parcial de las rutas afectadas | `scanner` |
-| `covers` | Extrae portada incrustada o `cover.jpg`/`folder.jpg`, la guarda en caché por hash | sistema de archivos |
-| `db` | Acceso a SQLite, migraciones, consultas | `node:sqlite` |
-| `library` | Arma el catálogo (álbumes, artistas, listas, canciones) y calcula listas de carpeta | `db` |
-| `api` | Rutas HTTP, autenticación, validación con zod | `library`, `db`, `pairing` |
-| `pairing` | Códigos de vinculación de un solo uso, tokens de dispositivos | `db` |
-| `discovery` | Anuncia el servicio por mDNS (`bonjour-service`) | — |
+| Unidad      | Responsabilidad                                                                                                                 | Depende de                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `scanner`   | Recorre carpetas raíz, lee metadata (`music-metadata`), calcula huellas, detecta movimientos, actualiza la base                 | `db`, `covers`             |
+| `watcher`   | Observa las raíces con `chokidar`, agrupa eventos (debounce ~2 s) y pide al `scanner` un escaneo parcial de las rutas afectadas | `scanner`                  |
+| `covers`    | Extrae portada incrustada o `cover.jpg`/`folder.jpg`, la guarda en caché por hash                                               | sistema de archivos        |
+| `db`        | Acceso a SQLite, migraciones, consultas                                                                                         | `node:sqlite`              |
+| `library`   | Arma el catálogo (álbumes, artistas, listas, canciones) y calcula listas de carpeta                                             | `db`                       |
+| `api`       | Rutas HTTP, autenticación, validación con zod                                                                                   | `library`, `db`, `pairing` |
+| `pairing`   | Códigos de vinculación de un solo uso, tokens de dispositivos                                                                   | `db`                       |
+| `discovery` | Anuncia el servicio por mDNS (`bonjour-service`)                                                                                | —                          |
 
 ### 3.2 Configuración y datos del servidor
 
@@ -164,27 +164,27 @@ Todos los cuerpos se validan con los esquemas zod de `packages/shared`.
 
 ### 5.2 Rutas de dispositivo
 
-| Método y ruta | Descripción |
-|---|---|
-| `POST /api/pair` | `{ code, deviceName }` → `{ token, serverId, serverName }`. El código es de un solo uso y vence a los 5 min |
-| `GET /api/catalog` | Catálogo completo (ver 5.4). Soporta `ETag` = revisión → `304` si no cambió |
-| `GET /api/tracks/:id/file` | Archivo de audio original; soporta `Range` (para retomar descargas). `409` si la raíz está offline |
-| `GET /api/covers/:id` | Imagen de portada |
+| Método y ruta              | Descripción                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `POST /api/pair`           | `{ code, deviceName }` → `{ token, serverId, serverName }`. El código es de un solo uso y vence a los 5 min |
+| `GET /api/catalog`         | Catálogo completo (ver 5.4). Soporta `ETag` = revisión → `304` si no cambió                                 |
+| `GET /api/tracks/:id/file` | Archivo de audio original; soporta `Range` (para retomar descargas). `409` si la raíz está offline          |
+| `GET /api/covers/:id`      | Imagen de portada                                                                                           |
 
 ### 5.3 Rutas de gestión (`/api/admin`, solo localhost)
 
-| Método y ruta | Descripción |
-|---|---|
-| `GET/POST/DELETE /api/admin/roots` | Listar, agregar (`{ path }`) y quitar carpetas raíz |
-| `GET /api/admin/browse?rootId=&path=` | Subcarpetas de una ruta dentro de una raíz (para elegir listas de carpeta) |
-| `POST /api/admin/scan` | Iniciar escaneo completo |
-| `GET /api/admin/events` | Server-Sent Events: progreso del escaneo y cambios de revisión |
-| `GET /api/admin/issues` | Archivos con problemas |
-| `POST /api/admin/playlists` | Crear lista manual (`{ name, trackIds? }`) o de carpeta (`{ name, rootId, folderRelPath }`) |
-| `PATCH /api/admin/playlists/:id` | Renombrar y/o reemplazar `trackIds` (orden) |
-| `DELETE /api/admin/playlists/:id` | Borrar lista |
-| `POST /api/admin/pairing-code` | Nuevo código → `{ code, expiresAt, qrPayload }` |
-| `GET /api/admin/devices` / `DELETE /api/admin/devices/:id` | Listar / revocar dispositivos |
+| Método y ruta                                              | Descripción                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `GET/POST/DELETE /api/admin/roots`                         | Listar, agregar (`{ path }`) y quitar carpetas raíz                                         |
+| `GET /api/admin/browse?rootId=&path=`                      | Subcarpetas de una ruta dentro de una raíz (para elegir listas de carpeta)                  |
+| `POST /api/admin/scan`                                     | Iniciar escaneo completo                                                                    |
+| `GET /api/admin/events`                                    | Server-Sent Events: progreso del escaneo y cambios de revisión                              |
+| `GET /api/admin/issues`                                    | Archivos con problemas                                                                      |
+| `POST /api/admin/playlists`                                | Crear lista manual (`{ name, trackIds? }`) o de carpeta (`{ name, rootId, folderRelPath }`) |
+| `PATCH /api/admin/playlists/:id`                           | Renombrar y/o reemplazar `trackIds` (orden)                                                 |
+| `DELETE /api/admin/playlists/:id`                          | Borrar lista                                                                                |
+| `POST /api/admin/pairing-code`                             | Nuevo código → `{ code, expiresAt, qrPayload }`                                             |
+| `GET /api/admin/devices` / `DELETE /api/admin/devices/:id` | Listar / revocar dispositivos                                                               |
 
 La web también usa `GET /api/catalog` (desde localhost no necesita token).
 
@@ -194,10 +194,10 @@ La web también usa `GET /api/catalog` (desde localhost no necesita token).
 interface Catalog {
   serverId: string;
   revision: number;
-  tracks: Track[];        // id, title, artist, albumId, trackNo, discNo, durationMs,
-                          // format, size, fingerprint, coverId, available
-  albums: Album[];        // id, title, artist, year, coverId, trackIds (ordenados)
-  playlists: Playlist[];  // id, name, type, trackIds (ordenados; calculados si es de carpeta)
+  tracks: Track[]; // id, title, artist, albumId, trackNo, discNo, durationMs,
+  // format, size, fingerprint, coverId, available
+  albums: Album[]; // id, title, artist, year, coverId, trackIds (ordenados)
+  playlists: Playlist[]; // id, name, type, trackIds (ordenados; calculados si es de carpeta)
 }
 ```
 

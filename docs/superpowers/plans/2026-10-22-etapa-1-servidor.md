@@ -88,11 +88,13 @@ apps/server/
 ### Task 1: Monorepo, tooling, CI y normalización en `shared`
 
 **Files:**
+
 - Create: `package.json`, `tsconfig.base.json`, `vitest.config.ts`, `eslint.config.js`, `.prettierrc.json`, `.gitignore`, `.github/workflows/ci.yml`
 - Create: `packages/shared/package.json`, `packages/shared/tsconfig.json`, `packages/shared/vitest.config.ts`, `packages/shared/src/index.ts`, `packages/shared/src/constants.ts`, `packages/shared/src/normalize.ts`
 - Test: `packages/shared/test/normalize.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `normalizeKey(s: string): string` — minúsculas (`toLocaleLowerCase('und')`), `NFC`, espacios colapsados y recortados.
   - `albumId(albumArtist: string, album: string): string` — `sha1hex(normalizeKey(albumArtist) + '\u0000' + normalizeKey(album)).slice(0, 16)`. Sin `node:crypto`, porque `shared` también corre en React Native: SHA-1 de `@noble/hashes` (dependencia de `@dsmn/shared`).
@@ -140,11 +142,13 @@ describe('albumId', () => {
 ### Task 2: Esquemas zod y tipos del catálogo/API
 
 **Files:**
+
 - Create: `packages/shared/src/schemas.ts`
 - Modify: `packages/shared/src/index.ts`
 - Test: `packages/shared/test/schemas.test.ts`
 
 **Interfaces:**
+
 - Produces (cada esquema `XSchema` exporta además `type X = z.infer<typeof XSchema>`):
   - `AudioFormat`: `'mp3' | 'flac' | 'm4a' | 'aac' | 'ogg' | 'opus' | 'wav'`
   - `Track`: `{ id, title, artist, albumId: string; trackNo, discNo: number | null; durationMs, size: number; format: AudioFormat; fingerprint: string; coverId: string | null; available: boolean }`
@@ -169,11 +173,19 @@ describe('albumId', () => {
 ```ts
 // packages/shared/test/schemas.test.ts
 import { describe, expect, it } from 'vitest';
-import { CreatePlaylistRequestSchema, PairRequestSchema, QrPayloadSchema, UpdatePlaylistRequestSchema } from '../src/index.ts';
+import {
+  CreatePlaylistRequestSchema,
+  PairRequestSchema,
+  QrPayloadSchema,
+  UpdatePlaylistRequestSchema,
+} from '../src/index.ts';
 
 describe('schemas', () => {
   it('CreatePlaylistRequest discrimina por type', () => {
-    expect(CreatePlaylistRequestSchema.parse({ type: 'manual', name: ' Gym ' })).toEqual({ type: 'manual', name: 'Gym' });
+    expect(CreatePlaylistRequestSchema.parse({ type: 'manual', name: ' Gym ' })).toEqual({
+      type: 'manual',
+      name: 'Gym',
+    });
     expect(CreatePlaylistRequestSchema.safeParse({ type: 'folder', name: 'X' }).success).toBe(false);
     expect(CreatePlaylistRequestSchema.safeParse({ type: 'manual', name: '   ' }).success).toBe(false);
   });
@@ -187,7 +199,10 @@ describe('schemas', () => {
   });
   it('QrPayload exige v=1 y al menos una url', () => {
     expect(QrPayloadSchema.safeParse({ v: 1, serverId: 's', urls: [], code: 'c' }).success).toBe(false);
-    expect(QrPayloadSchema.safeParse({ v: 1, serverId: 's', urls: ['http://192.168.0.2:4747'], code: 'c' }).success).toBe(true);
+    expect(
+      QrPayloadSchema.safeParse({ v: 1, serverId: 's', urls: ['http://192.168.0.2:4747'], code: 'c' })
+        .success,
+    ).toBe(true);
   });
 });
 ```
@@ -202,11 +217,13 @@ describe('schemas', () => {
 ### Task 3: `computeSyncPlan`
 
 **Files:**
+
 - Create: `packages/shared/src/syncPlan.ts`
 - Modify: `packages/shared/src/index.ts`
 - Test: `packages/shared/test/syncPlan.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Catalog`, `Track` (Task 2).
 - Produces:
   - `type Selection = { kind: 'album' | 'playlist'; id: string }`
@@ -217,7 +234,14 @@ describe('schemas', () => {
 
 ```ts
 it('baja la unión de lo seleccionado una sola vez', () => {
-  const plan = computeSyncPlan(cat, [{ kind: 'album', id: 'a1' }, { kind: 'playlist', id: 'p1' }], []);
+  const plan = computeSyncPlan(
+    cat,
+    [
+      { kind: 'album', id: 'a1' },
+      { kind: 'playlist', id: 'p1' },
+    ],
+    [],
+  );
   expect(plan.download.map((t) => t.id)).toEqual(['t1', 't2', 't3']);
   expect(plan.delete).toEqual([]);
 });
@@ -227,7 +251,11 @@ it('borra lo bajado que ya no es deseado', () => {
   expect(plan.delete).toEqual(['t3']);
 });
 it('rebaja si cambió la huella', () => {
-  const plan = computeSyncPlan(cat, [{ kind: 'album', id: 'a1' }], [{ trackId: 't1', fingerprint: 'viejo' }, dl('t2')]);
+  const plan = computeSyncPlan(
+    cat,
+    [{ kind: 'album', id: 'a1' }],
+    [{ trackId: 't1', fingerprint: 'viejo' }, dl('t2')],
+  );
   expect(plan.download.map((t) => t.id)).toEqual(['t1']);
 });
 it('poda selección inexistente y borra sus canciones', () => {
@@ -236,7 +264,13 @@ it('poda selección inexistente y borra sus canciones', () => {
   expect(plan.delete).toEqual(['t3']);
 });
 it('no baja ni borra canciones no disponibles que siguen seleccionadas', () => {
-  const c = { ...cat, albums: [...cat.albums, { id: 'a2', title: 'X', artist: 'Y', year: null, coverId: null, trackIds: ['t5'] }] };
+  const c = {
+    ...cat,
+    albums: [
+      ...cat.albums,
+      { id: 'a2', title: 'X', artist: 'Y', year: null, coverId: null, trackIds: ['t5'] },
+    ],
+  };
   expect(computeSyncPlan(c, [{ kind: 'album', id: 'a2' }], []).download).toEqual([]);
   expect(computeSyncPlan(c, [{ kind: 'album', id: 'a2' }], [dl('t5')]).delete).toEqual([]);
 });
@@ -244,6 +278,7 @@ it('borra descargas de canciones que ya no existen en el catálogo', () => {
   expect(computeSyncPlan(cat, [], [{ trackId: 'fantasma', fingerprint: 'x' }]).delete).toEqual(['fantasma']);
 });
 ```
+
 (`dl(id)` devuelve `{ trackId: id, fingerprint: <huella del catálogo> }`.)
 
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implementar.** **Step 4: Run** → PASS.
@@ -254,12 +289,14 @@ it('borra descargas de canciones que ya no existen en el catálogo', () => {
 ### Task 4: Configuración, base de datos y meta
 
 **Files:**
+
 - Create: `apps/server/package.json`, `apps/server/tsconfig.json`, `apps/server/vitest.config.ts`, `src/config.ts`, `src/events.ts`, `src/db/database.ts`, `src/db/schema.ts`, `src/db/meta.ts`, `src/library/revision.ts`, `src/http/errors.ts`, `test/helpers/fixtures.ts`
 - Test: `test/config.test.ts`, `test/db.test.ts`
 
 (Rutas relativas a `apps/server/` desde aquí.)
 
 **Interfaces:**
+
 - Produces:
   - `interface Config { dataDir: string; dbPath: string; coversDir: string; port: number }`; `loadConfig(env: NodeJS.ProcessEnv, platform: NodeJS.Platform, homedir: string): Config`. Puerto inválido (no entero o fuera de 1..65535) → `throw new Error('DSMN_PORT inválido: …')`. Usa `path.win32.join` cuando `platform === 'win32'`.
   - `openDatabase(file: string): DatabaseSync` (`':memory:'` permitido) — `PRAGMA journal_mode = WAL` (salvo memoria), `PRAGMA foreign_keys = ON`, luego `migrate(db)`.
@@ -297,14 +334,22 @@ it('migra y es idempotente', () => {
   migrate(db);
   expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: MIGRATIONS.length });
 });
-it('serverId persiste', () => { const db = makeDb(); expect(ensureServerId(db)).toBe(ensureServerId(db)); });
+it('serverId persiste', () => {
+  const db = makeDb();
+  expect(ensureServerId(db)).toBe(ensureServerId(db));
+});
 it('bumpRevision incrementa y emite', () => {
-  const db = makeDb(); const bus = new EventBus(); const seen: number[] = [];
+  const db = makeDb();
+  const bus = new EventBus();
+  const seen: number[] = [];
   bus.on('revision', (e) => seen.push(e.revision));
   expect([bumpRevision(db, bus), bumpRevision(db, bus)]).toEqual([1, 2]);
-  expect(seen).toEqual([1, 2]); expect(getRevision(db)).toBe(2);
+  expect(seen).toEqual([1, 2]);
+  expect(getRevision(db)).toBe(2);
 });
-it('borrar una raíz borra sus canciones y listas de carpeta en cascada', () => { /* insertar root, track, playlist folder; DELETE root; contar 0 */ });
+it('borrar una raíz borra sus canciones y listas de carpeta en cascada', () => {
+  /* insertar root, track, playlist folder; DELETE root; contar 0 */
+});
 ```
 
 - [ ] **Step 2: Run** `npx vitest run apps/server` → FAIL. **Step 3: Implementar.** **Step 4: Run** → PASS, `npm run typecheck` PASS.
@@ -315,10 +360,12 @@ it('borrar una raíz borra sus canciones y listas de carpeta en cascada', () => 
 ### Task 5: Generador de MP3 de prueba, lectura de metadata y huella
 
 **Files:**
+
 - Create: `test/helpers/mp3.ts`, `src/scan/readTrack.ts`, `src/scan/fingerprint.ts`
 - Test: `test/scan/readTrack.test.ts`, `test/scan/fingerprint.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `makeMp3(tags: Partial<{ title; artist; albumArtist; album; track: string; disc: string; year: string }>, opts?: { seconds?: number; picture?: { mime: string; data: Uint8Array } }): Uint8Array`
   - `interface TrackMeta { title: string; artist: string; albumArtist: string | null; album: string; trackNo: number | null; discNo: number | null; year: number | null; durationMs: number; format: AudioFormat }`
@@ -327,6 +374,7 @@ it('borrar una raíz borra sus canciones y listas de carpeta en cascada', () => 
   - `fingerprintFile(absPath: string, size: number): Promise<string>` — formato de Global Constraints, leyendo con `fs.promises.open` solo las dos ventanas.
 
 `makeMp3` (el algoritmo no lo determina la firma):
+
 ```
 ID3v2.4: "ID3" 0x04 0x00 0x00 + tamaño synchsafe(4) + frames.
 Frame de texto: id(4: TIT2 TPE1 TPE2 TALB TRCK TPOS TDRC) + synchsafe(4) + 0x0000 + 0x03 (UTF-8) + bytes.
@@ -339,20 +387,53 @@ Audio: round(seconds * 38.28) frames MPEG-1 Layer III 128 kbps 44.1 kHz:
 
 ```ts
 it('lee tags completos', async () => {
-  const f = await writeTmp('a.mp3', makeMp3({ title: 'Canción ñandú', artist: 'Björk', albumArtist: 'Varios', album: 'Homogenic', track: '3/10', disc: '1/2', year: '1997' }, { seconds: 2 }));
+  const f = await writeTmp(
+    'a.mp3',
+    makeMp3(
+      {
+        title: 'Canción ñandú',
+        artist: 'Björk',
+        albumArtist: 'Varios',
+        album: 'Homogenic',
+        track: '3/10',
+        disc: '1/2',
+        year: '1997',
+      },
+      { seconds: 2 },
+    ),
+  );
   const { meta, picture } = await readTrackFile(f);
-  expect(meta).toMatchObject({ title: 'Canción ñandú', artist: 'Björk', albumArtist: 'Varios', album: 'Homogenic', trackNo: 3, discNo: 1, year: 1997, format: 'mp3' });
-  expect(meta.durationMs).toBeGreaterThan(1500); expect(meta.durationMs).toBeLessThan(2500);
+  expect(meta).toMatchObject({
+    title: 'Canción ñandú',
+    artist: 'Björk',
+    albumArtist: 'Varios',
+    album: 'Homogenic',
+    trackNo: 3,
+    discNo: 1,
+    year: 1997,
+    format: 'mp3',
+  });
+  expect(meta.durationMs).toBeGreaterThan(1500);
+  expect(meta.durationMs).toBeLessThan(2500);
   expect(picture).toBeNull();
 });
 it('aplica valores por defecto sin tags', async () => {
   const { meta } = await readTrackFile(await writeTmp('Mi tema.mp3', makeMp3({})));
-  expect(meta).toMatchObject({ title: 'Mi tema', artist: 'Artista desconocido', albumArtist: null, album: 'Sin álbum', trackNo: null });
+  expect(meta).toMatchObject({
+    title: 'Mi tema',
+    artist: 'Artista desconocido',
+    albumArtist: null,
+    album: 'Sin álbum',
+    trackNo: null,
+  });
 });
 it('devuelve la portada incrustada', async () => {
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
-  const { picture } = await readTrackFile(await writeTmp('c.mp3', makeMp3({}, { picture: { mime: 'image/png', data: png } })));
-  expect(picture?.mime).toBe('image/png'); expect([...picture!.data]).toEqual([...png]);
+  const { picture } = await readTrackFile(
+    await writeTmp('c.mp3', makeMp3({}, { picture: { mime: 'image/png', data: png } })),
+  );
+  expect(picture?.mime).toBe('image/png');
+  expect([...picture!.data]).toEqual([...png]);
 });
 it('lanza con un archivo que no es audio', async () => {
   await expect(readTrackFile(await writeTmp('x.mp3', new TextEncoder().encode('hola')))).rejects.toThrow();
@@ -361,8 +442,12 @@ it('formatFromPath', () => {
   expect(['a.MP3', 'b.oga', 'c.opus', 'd.txt'].map(formatFromPath)).toEqual(['mp3', 'ogg', 'opus', null]);
 });
 // fingerprint.test.ts
-it('igual contenido → igual huella; un byte distinto al final → distinta', async () => { /* 300 KiB aleatorios; mutar último byte */ });
-it('archivos chicos se hashean completos', async () => { /* 10 bytes: huella empieza con "10:" y cambia si cambia un byte del medio */ });
+it('igual contenido → igual huella; un byte distinto al final → distinta', async () => {
+  /* 300 KiB aleatorios; mutar último byte */
+});
+it('archivos chicos se hashean completos', async () => {
+  /* 10 bytes: huella empieza con "10:" y cambia si cambia un byte del medio */
+});
 ```
 
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implementar** (`npm i -w @dsmn/server music-metadata`). **Step 4: Run** → PASS.
@@ -373,10 +458,12 @@ it('archivos chicos se hashean completos', async () => { /* 10 bytes: huella emp
 ### Task 6: Rutas relativas y portadas
 
 **Files:**
+
 - Create: `src/library/paths.ts`, `src/scan/covers.ts`
 - Test: `test/library/paths.test.ts`, `test/scan/covers.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `toRelPath(rootPath: string, absPath: string, p?: path.PlatformPath): string` — `p.relative`, separadores → `/`. Lanza si `absPath` no está dentro de `rootPath`.
   - `isUnderRelDir(relPath: string, relDir: string): boolean` — `relDir === ''` o `relPath === relDir` o `relPath.startsWith(relDir + '/')`.
@@ -397,8 +484,12 @@ it('isUnderRelDir no confunde prefijos', () => {
   expect(isUnderRelDir('Rockabilly/a.mp3', 'Rock')).toBe(false);
   expect(isUnderRelDir('x.mp3', '')).toBe(true);
 });
-it('findFolderCover encuentra Folder.JPG', async () => { /* crear Folder.JPG; mime image/jpeg */ });
-it('saveCover deduplica por contenido', () => { /* dos llamadas mismo data → mismo id, un archivo, una fila */ });
+it('findFolderCover encuentra Folder.JPG', async () => {
+  /* crear Folder.JPG; mime image/jpeg */
+});
+it('saveCover deduplica por contenido', () => {
+  /* dos llamadas mismo data → mismo id, un archivo, una fila */
+});
 ```
 
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implementar.** **Step 4: Run** → PASS.
@@ -409,10 +500,12 @@ it('saveCover deduplica por contenido', () => { /* dos llamadas mismo data → m
 ### Task 7: Reconciliación (altas, cambios, movimientos, bajas) y álbumes
 
 **Files:**
+
 - Create: `src/scan/reconcile.ts`
 - Test: `test/scan/reconcile.test.ts`
 
 **Interfaces:**
+
 - Consumes: `albumId`, `UNKNOWN_*` (Task 1), `TrackMeta` (Task 5).
 - Produces:
   - `interface ScannedFile { rootId: number; relPath: string; size: number; mtimeMs: number; fingerprint: string; meta: TrackMeta; coverId: string | null }`
@@ -420,7 +513,7 @@ it('saveCover deduplica por contenido', () => { /* dos llamadas mismo data → m
     1. existe fila con `(root_id, rel_path)` → actualizar metadata/huella/size/mtime, conservar `id` (`updated`);
     2. si no, primera fila de `missingTrackIds` aún no reclamada con la misma huella → actualizar ruta y metadata, conservar `id` (`moved`);
     3. si no → insertar con `crypto.randomUUID()` (`added`).
-    Luego borra las filas de `missingTrackIds` no reclamadas (`removed`) y llama `refreshAlbums(db)`. `tracks.album_id = albumId(meta.albumArtist ?? meta.artist, meta.album)`.
+       Luego borra las filas de `missingTrackIds` no reclamadas (`removed`) y llama `refreshAlbums(db)`. `tracks.album_id = albumId(meta.albumArtist ?? meta.artist, meta.album)`.
   - `refreshAlbums(db): void` — reconstruye `albums` desde `tracks`: `title` y `artist` de la primera canción por `(disc_no, track_no, title)`, `year` = máximo, `cover_id` = primera canción con portada en ese orden.
 
 - [ ] **Step 1: Write the failing tests** (helper `sf(relPath, fp, meta?)` arma un `ScannedFile` en la raíz 1)
@@ -429,30 +522,42 @@ it('saveCover deduplica por contenido', () => { /* dos llamadas mismo data → m
 it('inserta, y al reescanear la misma ruta conserva el id', () => {
   reconcile(db, { scanned: [sf('a.mp3', 'f1')], missingTrackIds: [] });
   const id = trackId('a.mp3');
-  expect(reconcile(db, { scanned: [sf('a.mp3', 'f2', { title: 'Nuevo' })], missingTrackIds: [] }).updated).toBe(1);
+  expect(
+    reconcile(db, { scanned: [sf('a.mp3', 'f2', { title: 'Nuevo' })], missingTrackIds: [] }).updated,
+  ).toBe(1);
   expect(trackId('a.mp3')).toBe(id);
 });
 it('detecta un movimiento y conserva las listas', () => {
   reconcile(db, { scanned: [sf('Viejo/a.mp3', 'f1')], missingTrackIds: [] });
-  const id = trackId('Viejo/a.mp3'); addToManualPlaylist(id);
+  const id = trackId('Viejo/a.mp3');
+  addToManualPlaylist(id);
   const r = reconcile(db, { scanned: [sf('Nuevo/a.mp3', 'f1')], missingTrackIds: [id] });
   expect(r).toMatchObject({ moved: 1, added: 0, removed: 0 });
-  expect(trackId('Nuevo/a.mp3')).toBe(id); expect(playlistTrackIds()).toEqual([id]);
+  expect(trackId('Nuevo/a.mp3')).toBe(id);
+  expect(playlistTrackIds()).toEqual([id]);
 });
 it('dos copias idénticas presentes son dos canciones', () => {
   const r = reconcile(db, { scanned: [sf('A/x.mp3', 'f1'), sf('B/x.mp3', 'f1')], missingTrackIds: [] });
   expect(r.added).toBe(2);
 });
-it('borra faltantes no reclamados y los saca de las listas', () => { /* removed 1, playlist vacía */ });
-it('arma álbumes por artista del álbum', () => {
-  reconcile(db, { scanned: [
-    sf('1.mp3', 'a', { artist: 'Queen', albumArtist: null, album: 'Jazz', trackNo: 2 }),
-    sf('2.mp3', 'b', { artist: 'Invitado', albumArtist: 'Queen', album: 'jazz', trackNo: 1 }),
-  ], missingTrackIds: [] });
-  const albums = db.prepare('SELECT * FROM albums').all();
-  expect(albums).toHaveLength(1); expect(albums[0]).toMatchObject({ title: 'jazz', artist: 'Queen' });
+it('borra faltantes no reclamados y los saca de las listas', () => {
+  /* removed 1, playlist vacía */
 });
-it('elimina álbumes que quedaron vacíos', () => { /* */ });
+it('arma álbumes por artista del álbum', () => {
+  reconcile(db, {
+    scanned: [
+      sf('1.mp3', 'a', { artist: 'Queen', albumArtist: null, album: 'Jazz', trackNo: 2 }),
+      sf('2.mp3', 'b', { artist: 'Invitado', albumArtist: 'Queen', album: 'jazz', trackNo: 1 }),
+    ],
+    missingTrackIds: [],
+  });
+  const albums = db.prepare('SELECT * FROM albums').all();
+  expect(albums).toHaveLength(1);
+  expect(albums[0]).toMatchObject({ title: 'jazz', artist: 'Queen' });
+});
+it('elimina álbumes que quedaron vacíos', () => {
+  /* */
+});
 ```
 
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implementar.** **Step 4: Run** → PASS.
@@ -463,10 +568,12 @@ it('elimina álbumes que quedaron vacíos', () => { /* */ });
 ### Task 8: Scanner
 
 **Files:**
+
 - Create: `src/scan/scanner.ts`, `test/helpers/fixtures.ts` (agregar `makeLibrary`)
 - Test: `test/scan/scanner.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tasks 4–7.
 - Produces:
   - `type Scope = { rootId: number; relDir: string }`
@@ -476,6 +583,7 @@ it('elimina álbumes que quedaron vacíos', () => { /* */ });
   - `makeLibrary(files: Record<string, Uint8Array>): Promise<string>` (crea carpeta temporal con esos archivos; claves con `/`).
 
 Comportamiento:
+
 - Todas las llamadas se encadenan en una cola (una promesa a la vez); `scanAll()` = `scanScopes` con `{ rootId, relDir: '' }` de cada raíz.
 - Por cada scope: si la carpeta de la raíz no existe o no es directorio → raíz `offline` (si cambió, cuenta como cambio) y se saltea **sin** tocar sus canciones. Si existe y estaba `offline` → `online`.
 - Recorre `join(root, relDir)` recursivamente; ignora entradas que empiezan con `.` y extensiones no soportadas.
@@ -488,15 +596,23 @@ Comportamiento:
 
 ```ts
 it('escanea una biblioteca y es idempotente', async () => {
-  const dir = await makeLibrary({ 'Queen/Jazz/01.mp3': makeMp3({ artist: 'Queen', album: 'Jazz' }), 'notas.txt': enc('x'), '.oculto.mp3': makeMp3({}) });
+  const dir = await makeLibrary({
+    'Queen/Jazz/01.mp3': makeMp3({ artist: 'Queen', album: 'Jazz' }),
+    'notas.txt': enc('x'),
+    '.oculto.mp3': makeMp3({}),
+  });
   const root = addRootRow(db, dir);
   expect(await scanner.scanAll()).toMatchObject({ added: 1, issues: 0 });
   expect(getRevision(db)).toBe(1);
   expect(await scanner.scanAll()).toMatchObject({ added: 0, updated: 0, removed: 0 });
   expect(getRevision(db)).toBe(1);
 });
-it('guarda títulos y rutas Unicode', async () => { /* 'Música/Canción ñandú.mp3' con artist 'Björk' → fila con rel_path y artist exactos */ });
-it('detecta un movimiento entre carpetas', async () => { /* scanAll, fs.rename a otra carpeta, scanAll → moved 1, mismo id */ });
+it('guarda títulos y rutas Unicode', async () => {
+  /* 'Música/Canción ñandú.mp3' con artist 'Björk' → fila con rel_path y artist exactos */
+});
+it('detecta un movimiento entre carpetas', async () => {
+  /* scanAll, fs.rename a otra carpeta, scanAll → moved 1, mismo id */
+});
 it('raíz desconectada: no borra y la marca offline; al volver, online', async () => {
   /* scanAll; fs.rename(dir, dir + '-x'); scanAll → removed 0, status offline, revisión sube;
      fs.rename de vuelta; scanAll → online */
@@ -509,8 +625,12 @@ it('archivo truncado va a issues y se limpia al completarse', async () => {
   expect(await scanner.scanAll()).toMatchObject({ added: 1, issues: 0 });
   expect(db.prepare('SELECT COUNT(*) n FROM scan_issues').get()).toEqual({ n: 0 });
 });
-it('scanScopes solo mira el subárbol pedido', async () => { /* borrar archivo en A y en B; scanScopes([{rootId, relDir:'A'}]) → removed 1 */ });
-it('usa folder.jpg cuando no hay portada incrustada', async () => { /* track.cover_id no nulo */ });
+it('scanScopes solo mira el subárbol pedido', async () => {
+  /* borrar archivo en A y en B; scanScopes([{rootId, relDir:'A'}]) → removed 1 */
+});
+it('usa folder.jpg cuando no hay portada incrustada', async () => {
+  /* track.cover_id no nulo */
+});
 it('serializa llamadas concurrentes', async () => {
   const [a, b] = await Promise.all([scanner.scanAll(), scanner.scanAll()]);
   expect(a.added + b.added).toBe(1);
@@ -525,10 +645,12 @@ it('serializa llamadas concurrentes', async () => {
 ### Task 9: Catálogo y listas
 
 **Files:**
+
 - Create: `src/library/catalog.ts`, `src/library/playlists.ts`
 - Test: `test/library/catalog.test.ts`, `test/library/playlists.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Catalog`, `CreatePlaylistRequest`, `UpdatePlaylistRequest` (Task 2); `bumpRevision` (Task 4); `isUnderRelDir` (Task 6).
 - Produces:
   - `buildCatalog(db, serverId: string): Catalog` — `available = raíz online`; álbumes ordenados por `(artist, title)` con `trackIds` por `(disc_no, track_no, title)`; listas ordenadas por `name`; manual por `position`; de carpeta = canciones de esa raíz con `isUnderRelDir(rel_path, folder_rel_path)` ordenadas por `rel_path`; `tracks` ordenadas por `(artist, album, disc_no, track_no)`.
@@ -546,13 +668,23 @@ it('lista de carpeta incluye subcarpetas y se actualiza sola', async () => {
      createPlaylist folder 'Chill' → trackIds [a, b];
      agregar 'Chill/d.mp3' + scanAll → buildCatalog la incluye */
 });
-it('marca no disponibles las canciones de raíces offline', () => { /* UPDATE roots SET status='offline' → available false */ });
-it('crear/editar/borrar lista manual sube la revisión', () => { /* revisiones 1,2,3; orden de trackIds respetado */ });
-it('rechaza trackIds desconocidos y carpetas con ..', () => {
-  expect(() => createPlaylist(db, bus, { type: 'manual', name: 'X', trackIds: ['nope'] })).toThrow(expect.objectContaining({ status: 400 }));
-  expect(() => createPlaylist(db, bus, { type: 'folder', name: 'X', rootId: 1, folderRelPath: '../afuera' })).toThrow(expect.objectContaining({ status: 400 }));
+it('marca no disponibles las canciones de raíces offline', () => {
+  /* UPDATE roots SET status='offline' → available false */
 });
-it('no permite fijar trackIds en una lista de carpeta', () => { /* 409 */ });
+it('crear/editar/borrar lista manual sube la revisión', () => {
+  /* revisiones 1,2,3; orden de trackIds respetado */
+});
+it('rechaza trackIds desconocidos y carpetas con ..', () => {
+  expect(() => createPlaylist(db, bus, { type: 'manual', name: 'X', trackIds: ['nope'] })).toThrow(
+    expect.objectContaining({ status: 400 }),
+  );
+  expect(() =>
+    createPlaylist(db, bus, { type: 'folder', name: 'X', rootId: 1, folderRelPath: '../afuera' }),
+  ).toThrow(expect.objectContaining({ status: 400 }));
+});
+it('no permite fijar trackIds en una lista de carpeta', () => {
+  /* 409 */
+});
 ```
 
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implementar.** **Step 4: Run** → PASS.
@@ -563,10 +695,12 @@ it('no permite fijar trackIds en una lista de carpeta', () => { /* 409 */ });
 ### Task 10: Raíces, explorador de carpetas y vinculación
 
 **Files:**
+
 - Create: `src/library/roots.ts`, `src/pairing/pairing.ts`, `src/net/lanUrls.ts`
 - Test: `test/library/roots.test.ts`, `test/pairing/pairing.test.ts`, `test/net/lanUrls.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `listRoots(db): Root[]`; `addRoot(db, bus, absPath: string): Root` — no absoluta / no existe / no es carpeta → `400`; duplicada, o dentro de / contenedora de otra raíz → `409`. Crea con estado `online` y llama `bumpRevision`. (El escaneo lo dispara la ruta HTTP.)
   - `removeRoot(db, bus, id): void` — `404` si no existe; `DELETE` (cascada), `refreshAlbums`, `bumpRevision`.
@@ -579,35 +713,48 @@ it('no permite fijar trackIds en una lista de carpeta', () => { /* 409 */ });
 
 ```ts
 it('addRoot valida y rechaza raíces anidadas', async () => {
-  const dir = await tmpDir(); await mkdir(join(dir, 'sub'));
+  const dir = await tmpDir();
+  await mkdir(join(dir, 'sub'));
   expect(addRoot(db, bus, dir).status).toBe('online');
   expect(() => addRoot(db, bus, dir)).toThrow(expect.objectContaining({ status: 409 }));
   expect(() => addRoot(db, bus, join(dir, 'sub'))).toThrow(expect.objectContaining({ status: 409 }));
   expect(() => addRoot(db, bus, 'relativa')).toThrow(expect.objectContaining({ status: 400 }));
   expect(() => addRoot(db, bus, join(dir, 'no-existe'))).toThrow(expect.objectContaining({ status: 400 }));
 });
-it('browse lista subcarpetas y bloquea escapes', async () => { /* carpetas B, a, .git → ['a','B']; '../' → 400 */ });
-it('removeRoot borra canciones, álbumes y listas de carpeta', async () => { /* */ });
+it('browse lista subcarpetas y bloquea escapes', async () => {
+  /* carpetas B, a, .git → ['a','B']; '../' → 400 */
+});
+it('removeRoot borra canciones, álbumes y listas de carpeta', async () => {
+  /* */
+});
 
 it('el código se canjea una sola vez', () => {
-  const p = createPairing(db); const { code } = p.createCode(0);
-  const r = p.redeem(code, 'Pixel', 1000); expect(r).not.toBeNull();
+  const p = createPairing(db);
+  const { code } = p.createCode(0);
+  const r = p.redeem(code, 'Pixel', 1000);
+  expect(r).not.toBeNull();
   expect(p.redeem(code, 'Otro', 1000)).toBeNull();
   expect(p.verifyToken(r!.token)?.name).toBe('Pixel');
 });
 it('el código vence a los 5 minutos', () => {
-  const p = createPairing(db); const { code } = p.createCode(0);
+  const p = createPairing(db);
+  const { code } = p.createCode(0);
   expect(p.redeem(code, 'Pixel', 300_001)).toBeNull();
 });
 it('revocar invalida el token y no se guarda el token en claro', () => {
   /* revokeDevice → verifyToken null; SELECT token_hash != token */
 });
 it('getLanUrls filtra IPs privadas IPv4', () => {
-  expect(getLanUrls(4747, {
-    lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true } as any],
-    eth: [{ address: '192.168.1.20', family: 'IPv4', internal: false } as any, { address: 'fe80::1', family: 'IPv6', internal: false } as any],
-    vpn: [{ address: '100.64.0.2', family: 'IPv4', internal: false } as any],
-  })).toEqual(['http://192.168.1.20:4747']);
+  expect(
+    getLanUrls(4747, {
+      lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true } as any],
+      eth: [
+        { address: '192.168.1.20', family: 'IPv4', internal: false } as any,
+        { address: 'fe80::1', family: 'IPv6', internal: false } as any,
+      ],
+      vpn: [{ address: '100.64.0.2', family: 'IPv4', internal: false } as any],
+    }),
+  ).toEqual(['http://192.168.1.20:4747']);
 });
 ```
 
@@ -619,10 +766,12 @@ it('getLanUrls filtra IPs privadas IPv4', () => {
 ### Task 11: App HTTP, autenticación y rutas de dispositivo
 
 **Files:**
+
 - Create: `src/http/app.ts`, `src/http/auth.ts`, `src/http/range.ts`, `src/http/deviceRoutes.ts`; completar `src/http/errors.ts`
 - Test: `test/http/range.test.ts`, `test/http/device.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tasks 4–10.
 - Produces:
   - `interface AppDeps { db: DatabaseSync; bus: EventBus; scanner: Scanner; pairing: Pairing; config: Config; serverId: string; serverName: string; lanUrls: () => string[]; onRootsChanged?: () => void }`
@@ -639,9 +788,14 @@ it('getLanUrls filtra IPs privadas IPv4', () => {
 ```ts
 // range.test.ts
 it.each([
-  [undefined, 100, null], ['bytes=0-', 100, { start: 0, end: 99 }], ['bytes=10-19', 100, { start: 10, end: 19 }],
-  ['bytes=90-500', 100, { start: 90, end: 99 }], ['bytes=100-', 100, 'invalid'], ['bytes=5-2', 100, 'invalid'],
-  ['bytes=0-1,5-6', 100, 'invalid'], ['items=0-1', 100, 'invalid'],
+  [undefined, 100, null],
+  ['bytes=0-', 100, { start: 0, end: 99 }],
+  ['bytes=10-19', 100, { start: 10, end: 19 }],
+  ['bytes=90-500', 100, { start: 90, end: 99 }],
+  ['bytes=100-', 100, 'invalid'],
+  ['bytes=5-2', 100, 'invalid'],
+  ['bytes=0-1,5-6', 100, 'invalid'],
+  ['items=0-1', 100, 'invalid'],
 ])('parseRange(%s, %i)', (h, size, exp) => expect(parseRange(h, size)).toEqual(exp));
 
 // device.test.ts
@@ -651,17 +805,33 @@ it('desde la red: catálogo requiere token y admin está prohibido', async () =>
 });
 it('vinculación completa y catálogo con ETag', async () => {
   const { code } = deps.pairing.createCode();
-  const pair = await app.inject({ method: 'POST', url: '/api/pair', remoteAddress: REMOTE, payload: { code, deviceName: 'Pixel' } });
+  const pair = await app.inject({
+    method: 'POST',
+    url: '/api/pair',
+    remoteAddress: REMOTE,
+    payload: { code, deviceName: 'Pixel' },
+  });
   expect(pair.statusCode).toBe(200);
   const auth = { authorization: `Bearer ${pair.json().token}` };
   const cat = await app.inject({ url: '/api/catalog', remoteAddress: REMOTE, headers: auth });
-  expect(cat.statusCode).toBe(200); expect(cat.json().serverId).toBe(deps.serverId);
-  const again = await app.inject({ url: '/api/catalog', remoteAddress: REMOTE, headers: { ...auth, 'if-none-match': cat.headers.etag as string } });
+  expect(cat.statusCode).toBe(200);
+  expect(cat.json().serverId).toBe(deps.serverId);
+  const again = await app.inject({
+    url: '/api/catalog',
+    remoteAddress: REMOTE,
+    headers: { ...auth, 'if-none-match': cat.headers.etag as string },
+  });
   expect(again.statusCode).toBe(304);
 });
 it('código inválido → 401 con formato de error', async () => {
-  const r = await app.inject({ method: 'POST', url: '/api/pair', remoteAddress: REMOTE, payload: { code: 'NOPE', deviceName: 'x' } });
-  expect(r.statusCode).toBe(401); expect(r.json()).toEqual({ error: { code: 'unauthorized', message: expect.any(String) } });
+  const r = await app.inject({
+    method: 'POST',
+    url: '/api/pair',
+    remoteAddress: REMOTE,
+    payload: { code: 'NOPE', deviceName: 'x' },
+  });
+  expect(r.statusCode).toBe(401);
+  expect(r.json()).toEqual({ error: { code: 'unauthorized', message: expect.any(String) } });
 });
 it('sirve el archivo completo y por rangos', async () => {
   /* track de la biblioteca de prueba: 200 con content-length = size y content-type audio/mpeg;
@@ -669,10 +839,15 @@ it('sirve el archivo completo y por rangos', async () => {
 });
 it('retomar una descarga completa → 416', async () => {
   const r = await app.inject({ url: `/api/tracks/${id}/file`, headers: { range: `bytes=${size}-` } });
-  expect(r.statusCode).toBe(416); expect(r.headers['content-range']).toBe(`bytes */${size}`);
+  expect(r.statusCode).toBe(416);
+  expect(r.headers['content-range']).toBe(`bytes */${size}`);
 });
-it('archivo de raíz offline → 409', async () => { /* */ });
-it('sirve archivos con nombres Unicode', async () => { /* 'Canción ñandú.mp3' → 200 */ });
+it('archivo de raíz offline → 409', async () => {
+  /* */
+});
+it('sirve archivos con nombres Unicode', async () => {
+  /* 'Canción ñandú.mp3' → 200 */
+});
 ```
 
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implementar** (`npm i -w @dsmn/server fastify`). **Step 4: Run** → PASS.
@@ -683,11 +858,13 @@ it('sirve archivos con nombres Unicode', async () => { /* 'Canción ñandú.mp3'
 ### Task 12: Rutas de gestión y eventos en vivo
 
 **Files:**
+
 - Create: `src/http/adminRoutes.ts`
 - Modify: `src/http/app.ts` (registrar rutas)
 - Test: `test/http/admin.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tasks 9–11.
 - Produces (todas `access: 'admin'`, cuerpos validados con los esquemas de Task 2):
   - `GET /api/admin/roots` → `Root[]`; `POST` → `201 Root` y dispara `scanner.scanScopes([{ rootId, relDir: '' }])` sin esperar; `DELETE /api/admin/roots/:id` → `204`. Tras agregar o quitar una raíz se llama `deps.onRootsChanged?.()`.
@@ -705,17 +882,30 @@ it('sirve archivos con nombres Unicode', async () => { /* 'Canción ñandú.mp3'
 it('flujo de raíz: agregar escanea y aparece en el catálogo', async () => {
   const r = await app.inject({ method: 'POST', url: '/api/admin/roots', payload: { path: libDir } });
   expect(r.statusCode).toBe(201);
-  await vi.waitFor(async () => expect((await app.inject({ url: '/api/catalog' })).json().tracks).toHaveLength(2));
+  await vi.waitFor(async () =>
+    expect((await app.inject({ url: '/api/catalog' })).json().tracks).toHaveLength(2),
+  );
 });
 it('cuerpo inválido → 400', async () => {
-  expect((await app.inject({ method: 'POST', url: '/api/admin/playlists', payload: { type: 'manual' } })).statusCode).toBe(400);
+  expect(
+    (await app.inject({ method: 'POST', url: '/api/admin/playlists', payload: { type: 'manual' } }))
+      .statusCode,
+  ).toBe(400);
 });
-it('CRUD de listas', async () => { /* 201 → PATCH reordena → DELETE 204 → PATCH 404 */ });
+it('CRUD de listas', async () => {
+  /* 201 → PATCH reordena → DELETE 204 → PATCH 404 */
+});
 it('pairing-code devuelve un QR válido', async () => {
   const r = (await app.inject({ method: 'POST', url: '/api/admin/pairing-code' })).json();
-  expect(QrPayloadSchema.parse(JSON.parse(r.qrPayload))).toMatchObject({ v: 1, serverId: deps.serverId, code: r.code });
+  expect(QrPayloadSchema.parse(JSON.parse(r.qrPayload))).toMatchObject({
+    v: 1,
+    serverId: deps.serverId,
+    code: r.code,
+  });
 });
-it('revocar dispositivo', async () => { /* redeem, DELETE 204, GET devices vacío, DELETE de nuevo 404 */ });
+it('revocar dispositivo', async () => {
+  /* redeem, DELETE 204, GET devices vacío, DELETE de nuevo 404 */
+});
 it('SSE envía estado inicial y cambios de revisión', async () => {
   await app.listen({ host: '127.0.0.1', port: 0 });
   const res = await fetch(`http://127.0.0.1:${port}/api/admin/events`);
@@ -736,11 +926,13 @@ it('SSE envía estado inicial y cambios de revisión', async () => {
 ### Task 13: Vigilante, mDNS, arranque y README
 
 **Files:**
+
 - Create: `src/scan/watcher.ts`, `src/net/discovery.ts`, `src/main.ts`, `apps/server/README.md`
 - Modify: `apps/server/package.json` (scripts `start`, `dev`: `tsx watch src/main.ts`)
 - Test: `test/scan/watcher.test.ts`, `test/net/discovery.test.ts`
 
 **Interfaces:**
+
 - Consumes: todo lo anterior.
 - Produces:
   - `createWatcher(deps: { db; scanner: Scanner; debounceMs?: number /* 2000 */; offlinePollMs?: number /* 60_000 */ }): { sync(): Promise<void>; close(): Promise<void> }` — `sync()` (re)crea un watcher de chokidar (`ignoreInitial: true`, `awaitWriteFinish: { stabilityThreshold: 2000 }`) por cada raíz online. Cada evento `add | change | unlink` aporta el directorio del archivo; `addDir | unlinkDir` aporta el propio directorio; se convierten a `Scope` con `toRelPath`. Tras `debounceMs` sin eventos se llama `scanner.scanScopes` con los scopes deduplicados (si un scope está dentro de otro, queda el de arriba). Cada `offlinePollMs` revisa raíces offline cuya ruta volvió a existir: llama `scanScopes([{ rootId, relDir: '' }])` y luego `sync()`.
@@ -753,7 +945,14 @@ it('SSE envía estado inicial y cambios de revisión', async () => {
 ```ts
 it('agrupa eventos y escanea el directorio afectado', async () => {
   const scanned: Scope[][] = [];
-  const fakeScanner = { scanScopes: async (s: Scope[]) => { scanned.push(s); return EMPTY; }, scanAll: async () => EMPTY, status: () => IDLE };
+  const fakeScanner = {
+    scanScopes: async (s: Scope[]) => {
+      scanned.push(s);
+      return EMPTY;
+    },
+    scanAll: async () => EMPTY,
+    status: () => IDLE,
+  };
   const w = createWatcher({ db, scanner: fakeScanner, debounceMs: 100 });
   await w.sync();
   await mkdir(join(libDir, 'Nuevo'));
@@ -765,8 +964,18 @@ it('agrupa eventos y escanea el directorio afectado', async () => {
 });
 it('publishService anuncia tipo, puerto e id', () => {
   const calls: object[] = [];
-  publishService({ bonjour: { publish: (o) => (calls.push(o), {}) }, serverId: 'abc', serverName: 'PC', port: 4747 });
-  expect(calls[0]).toEqual({ name: 'DontStopMeNow (PC)', type: 'dontstopmenow', port: 4747, txt: { id: 'abc', v: '1' } });
+  publishService({
+    bonjour: { publish: (o) => (calls.push(o), {}) },
+    serverId: 'abc',
+    serverName: 'PC',
+    port: 4747,
+  });
+  expect(calls[0]).toEqual({
+    name: 'DontStopMeNow (PC)',
+    type: 'dontstopmenow',
+    port: 4747,
+    txt: { id: 'abc', v: '1' },
+  });
 });
 ```
 
@@ -782,6 +991,7 @@ sleep 2; curl -s localhost:4799/api/catalog | head -c 300   # debe listar la can
 curl -s -X POST localhost:4799/api/admin/pairing-code        # debe traer code y qrPayload
 kill %1
 ```
+
 Expected: catálogo con la canción; código de 6 caracteres; el proceso termina limpio.
 
 - [ ] **Step 6: Commit** — `feat(server): vigilante de archivos, anuncio mDNS y arranque`
