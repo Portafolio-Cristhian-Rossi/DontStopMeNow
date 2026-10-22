@@ -1,6 +1,7 @@
 import {
   AddRootRequestSchema,
   CreatePlaylistRequestSchema,
+  QrPayloadSchema,
   UpdatePlaylistRequestSchema,
   type PairingCodeResponse,
   type QrPayload,
@@ -81,8 +82,10 @@ export function adminRoutes(app: FastifyInstance, deps: AppDeps): void {
   });
 
   app.post('/api/admin/pairing-code', admin, async (): Promise<PairingCodeResponse> => {
+    const urls = deps.lanUrls();
+    if (urls.length === 0) throw new HttpError(409, 'conflict', 'La compu no está conectada a una red local');
     const { code, expiresAt } = pairing.createCode();
-    const payload: QrPayload = { v: 1, serverId: deps.serverId, urls: deps.lanUrls(), code };
+    const payload: QrPayload = QrPayloadSchema.parse({ v: 1, serverId: deps.serverId, urls, code });
     return { code, expiresAt, qrPayload: JSON.stringify(payload) };
   });
 

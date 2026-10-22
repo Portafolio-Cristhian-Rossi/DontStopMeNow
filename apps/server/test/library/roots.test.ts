@@ -64,4 +64,13 @@ describe('roots', () => {
     expect([count('tracks'), count('albums'), count('playlists'), count('roots')]).toEqual([0, 0, 0, 0]);
     expect(() => removeRoot(db, bus, root.id)).toThrow(status(404));
   });
+
+  it('removeRoot borra los problemas de esa raíz', async () => {
+    const dir = await makeLibrary({ 'roto.mp3': new TextEncoder().encode('no'), 'ok.mp3': makeMp3({}) });
+    const root = addRoot(db, bus, dir);
+    await createScanner({ db, bus, coversDir: await tmpDir() }).scanAll();
+    expect(count('scan_issues')).toBe(1);
+    removeRoot(db, bus, root.id);
+    expect(count('scan_issues')).toBe(0);
+  });
 });

@@ -7,7 +7,7 @@ import { ensureServerId } from './db/meta.ts';
 import { EventBus } from './events.ts';
 import { buildApp } from './http/app.ts';
 import { publishService } from './net/discovery.ts';
-import { getLanUrls } from './net/lanUrls.ts';
+import { getLanUrls, startupMessage } from './net/lanUrls.ts';
 import { createPairing } from './pairing/pairing.ts';
 import { createScanner } from './scan/scanner.ts';
 import { createWatcher } from './scan/watcher.ts';
@@ -39,8 +39,7 @@ const app = buildApp(
 );
 
 await app.listen({ host: '0.0.0.0', port: config.port });
-console.log(`DontStopMeNow escuchando en el puerto ${config.port}`);
-for (const url of getLanUrls(config.port)) console.log(`  ${url}`);
+console.log(startupMessage(config.port, getLanUrls(config.port)));
 console.log(`Datos en ${config.dataDir}`);
 
 scanner

@@ -27,7 +27,11 @@ Al arrancar muestra las direcciones de la red local por las que el celular puede
 
 ## Agregar tu carpeta de música
 
-La interfaz web llega en la etapa 2. Mientras tanto, desde la misma compu:
+Lo más simple es la interfaz web: abrí **http://localhost:4747/ajustes** y usá "Agregar carpeta". Si la web
+no está compilada, el servidor te indica cómo hacerlo (`npm run build -w @dsmn/web`, o `npm start` desde la
+raíz del repo, que compila y arranca todo).
+
+También se puede hacer por la API, desde la misma compu:
 
 ```bash
 # Windows (PowerShell)
@@ -51,7 +55,8 @@ _Firewall de Windows Defender → Permitir una aplicación a través del firewal
 
 ## Seguridad
 
-- Las rutas de gestión (`/api/admin/*`) solo responden desde la propia compu.
+- La interfaz web y las rutas de gestión (`/api/admin/*`) solo responden desde la propia compu, y solo si
+  el navegador usa `localhost` / `127.0.0.1` (protege contra ataques de DNS rebinding).
 - El celular se vincula con un código de un solo uso que vence a los 5 minutos y recibe un token propio, que
   se puede revocar.
 

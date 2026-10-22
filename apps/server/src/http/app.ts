@@ -7,7 +7,8 @@ import type { Scanner } from '../scan/scanner.ts';
 import { adminRoutes } from './adminRoutes.ts';
 import { authHook } from './auth.ts';
 import { deviceRoutes } from './deviceRoutes.ts';
-import { errorHandler, notFoundHandler } from './errors.ts';
+import { errorHandler } from './errors.ts';
+import { registerStatic } from './static.ts';
 
 export interface AppDeps {
   db: DatabaseSync;
@@ -29,9 +30,9 @@ export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Fastif
     forceCloseConnections: true,
   });
   app.setErrorHandler(errorHandler);
-  app.setNotFoundHandler(notFoundHandler);
   app.addHook('onRequest', authHook(deps.pairing));
   deviceRoutes(app, deps);
   adminRoutes(app, deps);
+  registerStatic(app, deps.config.webDir);
   return app;
 }

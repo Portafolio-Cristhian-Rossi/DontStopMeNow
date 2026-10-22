@@ -16,7 +16,9 @@ afterEach(async () => {
 });
 
 /** App con base en memoria y dependencias reales. */
-export async function makeApp(): Promise<{ app: FastifyInstance; deps: AppDeps }> {
+export async function makeApp(
+  overrides: { webDir?: string | null } = {},
+): Promise<{ app: FastifyInstance; deps: AppDeps }> {
   const db = makeDb();
   const bus = new EventBus();
   const coversDir = await tmpDir();
@@ -25,7 +27,13 @@ export async function makeApp(): Promise<{ app: FastifyInstance; deps: AppDeps }
     bus,
     scanner: createScanner({ db, bus, coversDir }),
     pairing: createPairing(db),
-    config: { dataDir: tmpdir(), dbPath: ':memory:', coversDir, port: 4747 },
+    config: {
+      dataDir: tmpdir(),
+      dbPath: ':memory:',
+      coversDir,
+      port: 4747,
+      webDir: overrides.webDir ?? null,
+    },
     serverId: ensureServerId(db),
     serverName: 'PC-Test',
     lanUrls: () => ['http://192.168.1.10:4747'],

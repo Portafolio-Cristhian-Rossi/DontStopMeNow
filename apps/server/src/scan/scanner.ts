@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs';
 import { existsSync } from 'node:fs';
 import { readdir, realpath, stat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { ScanStatus } from '@dsmn/shared';
 import type { EventBus } from '../events.ts';
@@ -153,12 +153,22 @@ export function createScanner(deps: { db: DatabaseSync; bus: EventBus; coversDir
       .map((r) => r.id);
   }
 
+  /** Borra problemas de archivos bajo las carpetas escaneadas que ya no existen. */
+  function removeStaleIssues(dirs: string[], present: Set<string>) {
+    const paths = db.prepare('SELECT path FROM scan_issues').all() as { path: string }[];
+    for (const { path } of paths) {
+      if (present.has(path)) continue;
+      if (dirs.some((d) => path.startsWith(d + sep))) clearIssue.run(path);
+    }
+  }
+
   async function run(scopes: Scope[], statusChangedBefore = false): Promise<ScanSummary> {
     let rootStatusChanged = statusChangedBefore;
     const found = new Map<string, FoundFile>();
     const known = new Map<string, TrackRow & { rootId: number }>();
     const failed: { rootId: number; relDir: string }[] = [];
     const partialRoots = new Set<number>();
+    const scannedDirs: string[] = [];
 
     for (const scope of scopes) {
       const root = db.prepare('SELECT id, path, status FROM roots WHERE id = ?').get(scope.rootId) as
@@ -184,6 +194,7 @@ export function createScanner(deps: { db: DatabaseSync; bus: EventBus; coversDir
       if (!online) continue;
 
       if (!scopes.some((sc) => sc.rootId === root.id && sc.relDir === '')) partialRoots.add(root.id);
+      scannedDirs.push(dir);
       for (const row of rows) known.set(`${root.id}:${row.rel_path}`, { ...row, rootId: root.id });
       for (const absPath of listing.files) {
         const relPath = toRelPath(root.path, absPath);
@@ -254,6 +265,7 @@ export function createScanner(deps: { db: DatabaseSync; bus: EventBus; coversDir
     }
 
     const result = reconcile(db, { scanned, missingTrackIds: [...missingTrackIds] });
+    removeStaleIssues(scannedDirs, new Set([...found.values()].map((f) => f.absPath)));
     const changed = result.added + result.updated + result.moved + result.removed > 0 || rootStatusChanged;
     if (changed) bumpRevision(db, bus);
     setStatus({ running: false, processed, total });

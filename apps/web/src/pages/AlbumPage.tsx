@@ -1,0 +1,57 @@
+import { useState } from 'react';
+import { useParams } from 'react-router';
+import { useCatalog } from '../api/queries.ts';
+import { AddToPlaylistDialog } from '../components/AddToPlaylistDialog.tsx';
+import { Cover } from '../components/Cover.tsx';
+import { TrackTable } from '../components/TrackTable.tsx';
+import { formatDuration } from '../lib/format.ts';
+
+export function AlbumPage() {
+  const { id } = useParams();
+  const { data, isPending, error } = useCatalog();
+  const [adding, setAdding] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  if (isPending) return <p className="muted">Cargando…</p>;
+  if (error) return <p className="error">{error.message}</p>;
+
+  const album = data.albums.find((a) => a.id === id);
+  if (!album) return <p className="empty">Álbum no encontrado</p>;
+
+  const byId = new Map(data.tracks.map((t) => [t.id, t]));
+  const tracks = album.trackIds.flatMap((tid) => byId.get(tid) ?? []);
+  const total = tracks.reduce((sum, t) => sum + t.durationMs, 0);
+  const details = [album.artist, album.year, `${tracks.length} canciones`, formatDuration(total)].filter(
+    Boolean,
+  );
+
+  return (
+    <>
+      <div className="album-header">
+        <Cover coverId={album.coverId} title={album.title} />
+        <div>
+          <h1>{album.title}</h1>
+          <p className="muted">{details.join(' · ')}</p>
+          <button type="button" onClick={() => setAdding(true)}>
+            Agregar a lista…
+          </button>
+        </div>
+      </div>
+      {notice && (
+        <p className="muted" role="status">
+          {notice}
+        </p>
+      )}
+      {adding && (
+        <AddToPlaylistDialog
+          trackIds={tracks.map((t) => t.id)}
+          onClose={(message) => {
+            setAdding(false);
+            if (message) setNotice(message);
+          }}
+        />
+      )}
+      <TrackTable tracks={tracks} albums={new Map([[album.id, album]])} />
+    </>
+  );
+}
