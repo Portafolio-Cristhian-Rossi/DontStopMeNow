@@ -6,6 +6,7 @@ import { Cover } from '../../src/components/Cover.tsx';
 import { TrackRow } from '../../src/components/TrackRow.tsx';
 import { libraryView } from '../../src/core/library.ts';
 import { useApp } from '../../src/state/AppContext.tsx';
+import { usePlayer } from '../../src/state/PlayerContext.tsx';
 
 type Tab = 'albumes' | 'artistas' | 'listas' | 'canciones';
 const TABS: [Tab, string][] = [
@@ -17,6 +18,7 @@ const TABS: [Tab, string][] = [
 
 export default function Biblioteca() {
   const { catalog, downloadedIds } = useApp();
+  const player = usePlayer();
   const [tab, setTab] = useState<Tab>('albumes');
   const [artist, setArtist] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -36,6 +38,7 @@ export default function Biblioteca() {
   const q = searchKey(query.trim());
   const matches = (...texts: string[]) => !q || searchKey(texts.join(' ')).includes(q);
   const albums = view.albums.filter((a) => (!artist || a.artist === artist) && matches(a.title, a.artist));
+  const songs = view.tracks.filter((t) => matches(t.title, t.artist));
 
   return (
     <View style={{ flex: 1 }}>
@@ -115,9 +118,19 @@ export default function Biblioteca() {
       )}
       {tab === 'canciones' && (
         <FlatList
-          data={view.tracks.filter((t) => matches(t.title, t.artist))}
+          data={songs}
           keyExtractor={(t) => t.id}
-          renderItem={({ item }) => <TrackRow track={item} />}
+          renderItem={({ item, index }) => (
+            <TrackRow
+              track={item}
+              onPress={() =>
+                player.playList(
+                  songs.map((t) => t.id),
+                  index,
+                )
+              }
+            />
+          )}
           initialNumToRender={30}
         />
       )}
