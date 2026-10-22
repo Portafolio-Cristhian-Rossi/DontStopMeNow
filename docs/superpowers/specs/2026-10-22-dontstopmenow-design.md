@@ -214,7 +214,8 @@ con todas las IPv4 privadas de la compu. El celular prueba las URLs en orden.
 
 ```
 server       (server_id, name, last_url, token)
-catalog_*    copia del último catálogo recibido (tracks, albums, playlists, revision)
+catalog      último catálogo recibido, como JSON en una fila (con su ETag)
+partials     estado de pausa de descargas a medio terminar (para retomarlas)
 selection    (kind: 'album'|'playlist', id)
 downloads    (track_id, fingerprint, local_path, size)
 player_state (queue, index, position_ms, repeat, shuffle)
@@ -238,9 +239,16 @@ player_state (queue, index, position_ms, repeat, shuffle)
   avisa cuánto falta y no se empieza.
 - Se aplican primero los borrados (excepto la canción que está sonando, que queda para
   la próxima sincronización) y después las descargas.
-- Descargas: 2 en paralelo. Cada una escribe en `<id>.part`; si ya existe, retoma con
-  `Range: bytes=<tamaño>-` e `If-Range: "<fingerprint>"` (si el archivo cambió en la compu, el servidor responde `200` y se reescribe desde cero). Al terminar, verifica el tamaño, renombra a `<id>.<ext>` y
-  registra en `downloads`.
+- Descargas: 2 en paralelo, con `DownloadTask` de expo-file-system, a `<id>.part`.
+  - Si la app pasa a segundo plano o el usuario toca "Detener", la descarga se pausa y su
+    estado (`savable`) se guarda en `partials`; la próxima vez se retoma desde ahí.
+  - Si la descarga falla por un error de red no hay estado para retomar: se reintenta desde
+    cero.
+  - **Toda descarga terminada se verifica con la huella** (misma fórmula que el servidor,
+    `fingerprintFromWindows` de `@dsmn/shared`). Si coincide, se renombra a `<id>.<ext>` y se
+    registra en `downloads`; si no, se borra y se baja de nuevo completa una vez. Un `.part`
+    nunca se registra como descargado.
+  - El servidor igualmente envía `ETag` y respeta `If-Range`.
 - Error de red o 5xx: hasta 3 reintentos con espera creciente (2 s, 4 s, 8 s). Si sigue
   fallando, se marca la canción como fallida y se continúa; al final se muestra el resumen.
 - Si se pierde la conexión con el servidor, se detiene; lo ya bajado queda.
@@ -315,8 +323,9 @@ Datos con TanStack Query; navegación con React Router.
     prueba de menos de 1 s generados en los fixtures, base SQLite temporal. Incluye
     auth (localhost vs red), `Range`, `ETag`/`304`, vinculación.
 - **`apps/web`:** Vitest + Testing Library en editor de listas y ajustes de carpetas.
-- **`apps/mobile`:** Jest para la lógica (gestor de descargas con red simulada,
-  restauración de estado). Reproductor y descargas reales: lista de verificación
+- **`apps/mobile`:** Vitest para la lógica de `src/core` (sincronización con red y archivos
+  simulados, almacenamiento local sobre `node:sqlite`, vinculación, descubrimiento); las
+  pantallas se verifican con typecheck y `expo export`. Reproductor y descargas reales: lista de verificación
   manual en el dispositivo.
 - **CI (GitHub Actions):** lint, typecheck y tests en cada push.
 

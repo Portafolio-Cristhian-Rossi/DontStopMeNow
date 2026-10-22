@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "DontStopMeNow",
+    "slug": "dontstopmenow",
+    "scheme": "dontstopmenow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.cristhianrossi.dontstopmenow",
+      "permissions": ["CHANGE_WIFI_MULTICAST_STATE", "ACCESS_WIFI_STATE"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      ["expo-camera", { "cameraPermission": "La cámara se usa para escanear el código QR del servidor." }],
+      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+    ]
+  }
+}

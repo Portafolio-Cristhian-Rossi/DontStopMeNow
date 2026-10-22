@@ -6,3 +6,5 @@ coverage/
 .dsmn-data/
 .superpowers/
 dist/
+.expo/
+.expo-export/

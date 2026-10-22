@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { fingerprintFromWindows } from '@dsmn/shared';
 import { describe, expect, it } from 'vitest';
 import { fingerprintFile } from '../../src/scan/fingerprint.ts';
 import { writeTmp } from '../helpers/fixtures.ts';
@@ -20,5 +21,13 @@ describe('fingerprintFile', () => {
     expect(a.startsWith('10:')).toBe(true);
     const changed = Buffer.from('01234X6789');
     expect(await fingerprintFile(await writeTmp('b.bin', changed), 10)).not.toBe(a);
+  });
+
+  it('coincide con fingerprintFromWindows de shared', async () => {
+    const data = randomBytes(300 * 1024);
+    const file = await writeTmp('x.bin', data);
+    expect(await fingerprintFile(file, data.length)).toBe(
+      fingerprintFromWindows(data.length, data.subarray(0, 65536), data.subarray(data.length - 65536)),
+    );
   });
 });
