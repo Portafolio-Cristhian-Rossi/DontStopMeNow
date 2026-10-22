@@ -1,4 +1,4 @@
-import { rename, rm, writeFile } from 'node:fs/promises';
+import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -89,10 +89,10 @@ describe('scanner', () => {
     const dir = await makeLibrary({ 'A/a.mp3': makeMp3({ title: 'a' }), 'B/b.mp3': makeMp3({ title: 'b' }) });
     const rootId = addRootRow(db, dir);
     await scanner.scanAll();
-    await rm(join(dir, 'A', 'a.mp3'));
-    await rm(join(dir, 'B', 'b.mp3'));
-    expect(await scanner.scanScopes([{ rootId, relDir: 'A' }])).toMatchObject({ removed: 1 });
-    expect(idOf('B/b.mp3')).toBeDefined();
+    await writeFile(join(dir, 'A', 'c.mp3'), makeMp3({ title: 'c' }));
+    await writeFile(join(dir, 'B', 'd.mp3'), makeMp3({ title: 'd' }));
+    expect(await scanner.scanScopes([{ rootId, relDir: 'A' }])).toMatchObject({ added: 1, removed: 0 });
+    expect(idOf('B/d.mp3')).toBeUndefined();
   });
 
   it('usa folder.jpg cuando no hay portada incrustada', async () => {
