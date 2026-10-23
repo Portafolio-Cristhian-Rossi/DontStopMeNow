@@ -252,6 +252,15 @@ export function deleteJob(db: DatabaseSync, id: number): void {
   else db.prepare('DELETE FROM yt_jobs WHERE id = ?').run(id);
 }
 
+/** Canciones de la biblioteca, para marcar lo que ya está en la previsualización. */
+export function libraryTracks(db: DatabaseSync): { id: string; title: string; artist: string }[] {
+  return db.prepare('SELECT id, title, artist FROM tracks').all() as {
+    id: string;
+    title: string;
+    artist: string;
+  }[];
+}
+
 /** Al arrancar: lo que quedó bajando cuando se cortó el servidor vuelve a la espera. */
 export function resetInterrupted(db: DatabaseSync): void {
   db.exec("UPDATE yt_jobs SET status = 'pending' WHERE status = 'running'");

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Config } from '../config.ts';
+import { downloadRoutes, type Downloads } from '../downloads/routes.ts';
 import type { EventBus } from '../events.ts';
 import type { Pairing } from '../pairing/pairing.ts';
 import type { Scanner } from '../scan/scanner.ts';
@@ -20,6 +21,8 @@ export interface AppDeps {
   serverName: string;
   lanUrls: () => string[];
   onRootsChanged?: () => void;
+  /** Descargas desde YouTube; opcional para que los tests que no las usan no tengan que armarlas. */
+  downloads?: Downloads;
 }
 
 export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): FastifyInstance {
@@ -33,6 +36,7 @@ export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Fastif
   app.addHook('onRequest', authHook(deps.pairing));
   deviceRoutes(app, deps);
   adminRoutes(app, deps);
+  if (deps.downloads) downloadRoutes(app, deps, deps.downloads);
   registerStatic(app, deps.config.webDir);
   return app;
 }

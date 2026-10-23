@@ -13,18 +13,12 @@ import type { BusEvents } from '../events.ts';
 import { createPlaylist, deletePlaylist, updatePlaylist } from '../library/playlists.ts';
 import { addRoot, browse, listFolders, listPlaces, listRoots, removeRoot } from '../library/roots.ts';
 import type { AppDeps } from './app.ts';
-import { HttpError, parseBody } from './errors.ts';
+import { HttpError, intParam, parseBody } from './errors.ts';
 
 const admin = { config: { access: 'admin' as const } };
 const PING_MS = 25_000;
 
 type IdParams = { Params: { id: string } };
-
-function intParam(value: string | undefined, name: string): number {
-  const n = Number(value);
-  if (!Number.isInteger(n)) throw new HttpError(400, 'bad_request', `${name} inválido`);
-  return n;
-}
 
 export function adminRoutes(app: FastifyInstance, deps: AppDeps): void {
   const { db, bus, scanner, pairing } = deps;
@@ -115,17 +109,20 @@ export function adminRoutes(app: FastifyInstance, deps: AppDeps): void {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     const onScan = (s: BusEvents['scan']) => send('scan', s);
     const onRevision = (r: BusEvents['revision']) => send('revision', r);
+    const onDownload = (d: BusEvents['download']) => send('download', d);
 
     send('scan', scanner.status());
     send('revision', { revision: getRevision(db) });
     bus.on('scan', onScan);
     bus.on('revision', onRevision);
+    bus.on('download', onDownload);
     const ping = setInterval(() => res.write(': ping\n\n'), PING_MS);
 
     req.raw.on('close', () => {
       clearInterval(ping);
       bus.off('scan', onScan);
       bus.off('revision', onRevision);
+      bus.off('download', onDownload);
     });
   });
 }

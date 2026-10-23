@@ -30,6 +30,13 @@ export function notFoundHandler(_req: FastifyRequest, reply: FastifyReply) {
 }
 
 /** Valida con zod; si falla, 400 con el primer mensaje. */
+/** Parámetro de ruta entero (`:id`), o 400. */
+export function intParam(value: string | undefined, name: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n)) throw new HttpError(400, 'bad_request', `${name} inválido`);
+  return n;
+}
+
 export function parseBody<S extends z.ZodType>(schema: S, body: unknown): z.infer<S> {
   const result = schema.safeParse(body);
   if (!result.success) {
