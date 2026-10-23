@@ -351,3 +351,8 @@ termina con algo que funciona y se puede probar.
 4. **App móvil — reproductor.**
 5. **Empaquetado:** ejecutable para Windows (Node SEA), `Dockerfile` opcional para
    Linux, README de instalación.
+
+Las cinco etapas están implementadas. Distribución: el workflow `Release` arma
+`DontStopMeNow-windows-x64.zip` y `DontStopMeNow-linux-x64.zip` (ejecutable autocontenido + `web/` +
+`LEEME.txt`) y los publica al crear un tag `v*`; en Linux también hay `Dockerfile` y `docker-compose.yml`
+(red del host). La app Android se compila con EAS (ver `apps/mobile/README.md`).

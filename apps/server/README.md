@@ -3,6 +3,9 @@
 Corre en la compu: indexa tu música a partir de la metadata, gestiona listas y le sirve el catálogo y los
 archivos a la app del celular.
 
+> Para **instalar** el servidor sin Node (ejecutable de Windows o Docker), mirá la sección
+> [Instalación del README principal](../../README.md#instalación). Lo que sigue es para correrlo desde el código.
+
 ## Requisitos
 
 - Node.js 22.22 o superior (recomendado: 24 LTS).
