@@ -1,30 +1,17 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildDownloadArgs } from '../../src/downloads/recipe.ts';
 import { createYtDlp, type YtDlp } from '../../src/downloads/ytdlp.ts';
 import { tmpDir } from '../helpers/fixtures.ts';
+import { fakeCalls, installFakeYtDlp } from '../helpers/ytdlp.ts';
 
 let fake: string;
 let dest: string;
 let tmp: string;
 let yt: YtDlp;
 
-/** Copia el yt-dlp falso a una carpeta con espacios, como "C:\Program Files\yt-dlp". */
-async function installFake(): Promise<string> {
-  const dir = join(await tmpDir(), 'yt dlp test');
-  await mkdir(dir);
-  const target = join(dir, 'fakeYtDlp.ts');
-  await copyFile(join(import.meta.dirname, '..', 'helpers', 'fakeYtDlp.ts'), target);
-  return target;
-}
-
-const calls = () =>
-  readFileSync(join(fake, '..', 'calls.jsonl'), 'utf8')
-    .trim()
-    .split('\n')
-    .map((l) => JSON.parse(l) as { args: string[]; pythonIoEncoding: string | null });
+const calls = () => fakeCalls(fake);
 const lastCall = () => calls().at(-1)!.args;
 
 const argsFor = (id: string) =>
@@ -37,7 +24,7 @@ const argsFor = (id: string) =>
   });
 
 beforeEach(async () => {
-  fake = await installFake();
+  fake = await installFakeYtDlp();
   dest = await tmpDir();
   tmp = await tmpDir();
   yt = createYtDlp({ command: process.execPath, prefixArgs: [fake] });
