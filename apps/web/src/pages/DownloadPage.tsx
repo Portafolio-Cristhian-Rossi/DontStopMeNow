@@ -3,7 +3,9 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { api } from '../api/client.ts';
 import { useYtDlp } from '../api/queries.ts';
+import { DownloadQueue } from '../components/DownloadQueue.tsx';
 import { PreviewTable } from '../components/PreviewTable.tsx';
+import { YtSources } from '../components/YtSources.tsx';
 
 export function DownloadPage() {
   const ytdlp = useYtDlp();
@@ -15,21 +17,24 @@ export function DownloadPage() {
 
   const ready = Boolean(ytdlp.data?.version && ytdlp.data.ffmpeg);
 
-  async function look(e: FormEvent) {
-    e.preventDefault();
-    const link = url.trim();
-    if (!link) return;
+  async function show(load: () => Promise<Preview>) {
     setLoading(true);
     setError(null);
     setMessage(null);
     setPreview(null);
     try {
-      setPreview(await api.preview(link));
+      setPreview(await load());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
+  }
+
+  function look(e: FormEvent) {
+    e.preventDefault();
+    const link = url.trim();
+    if (link) void show(() => api.preview(link));
   }
 
   return (
@@ -68,6 +73,8 @@ export function DownloadPage() {
           }}
         />
       )}
+      <DownloadQueue />
+      <YtSources busy={loading} onCheck={(id) => void show(() => api.checkSource(id))} />
     </>
   );
 }

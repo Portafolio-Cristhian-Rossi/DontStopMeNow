@@ -367,6 +367,26 @@ input[type='text'].wide {
   margin: 1rem 0 0;
 }
 
+.queue-job {
+  margin-bottom: 0.75rem;
+}
+
+.queue-job .toolbar {
+  margin-bottom: 0.25rem;
+}
+
+.queue-job details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.queue-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+
 .badge {
   display: inline-block;
   margin: 0 0.25rem 0.25rem 0;
