@@ -8,3 +8,5 @@ coverage/
 dist/
 .expo/
 .expo-export/
+/release/
+/dist/
