@@ -4,6 +4,7 @@ import { DownloadProgressContext, ScanStatusContext, useServerEvents } from '../
 const SECTIONS = [
   { to: '/biblioteca/albumes', label: 'Biblioteca', prefix: '/biblioteca' },
   { to: '/listas', label: 'Listas', prefix: '/listas' },
+  { to: '/descargar', label: 'Descargar', prefix: '/descargar' },
   { to: '/ajustes', label: 'Ajustes', prefix: '/ajustes' },
   { to: '/dispositivos', label: 'Dispositivos', prefix: '/dispositivos' },
 ];
