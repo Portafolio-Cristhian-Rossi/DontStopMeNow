@@ -1,0 +1,32 @@
+DontStopMeNow — servidor de música
+===================================
+
+Cómo usarlo
+1. Doble clic en DontStopMeNow.exe. Se abre una ventana negra: dejala abierta mientras uses el programa
+   (para cerrarlo, cerrá esa ventana). No hagas clic adentro de la ventana: Windows pausa el programa
+   mientras hay texto seleccionado. Si pasa, apretá Esc.
+2. La primera vez, Windows pregunta si permitís el acceso a la red (puede aparecer como "Node.js JavaScript
+   Runtime"): aceptá para "redes privadas". Si no, el celular no va a encontrar la compu.
+3. Se abre el navegador en http://localhost:4747. En Ajustes agregá tu carpeta de música y en
+   Dispositivos escaneá el código QR con la app del celular.
+
+Si Windows muestra "Windows protegió su PC"
+El programa no está firmado digitalmente. Tocá "Más información" y después "Ejecutar de todas formas".
+En Windows 11 con "Control inteligente de aplicaciones" activado, los programas sin firma se bloquean sin
+esa opción: hay que desactivarlo en Seguridad de Windows > Control de aplicaciones y navegador.
+
+Tus datos
+La biblioteca, las listas y los celulares vinculados se guardan en %APPDATA%\DontStopMeNow, no en esta
+carpeta.
+
+Actualizar
+Cerrá la ventana del programa y reemplazá esta carpeta por la de la versión nueva. Tus datos se conservan.
+
+Que arranque con Windows
+Apretá Windows+R, escribí shell:startup y Enter, y poné ahí un acceso directo a DontStopMeNow.exe.
+Para que no abra el navegador cada vez: clic derecho en el acceso directo > Propiedades, y en "Destino"
+agregá al final, después de un espacio, --sin-navegador.
+
+Si lo abrís cuando ya está abierto, se abre el navegador con el que ya está andando.
+
+Más información: https://github.com/Portafolio-Cristhian-Rossi/DontStopMeNow
