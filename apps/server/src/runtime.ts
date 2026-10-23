@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { createInterface } from 'node:readline';
 import { isSea } from 'node:sea';
 import { fileURLToPath } from 'node:url';
 
@@ -51,7 +52,8 @@ export function browserCommand(
   platform: NodeJS.Platform,
   url: string,
 ): { cmd: string; args: string[] } | null {
-  if (platform === 'win32') return { cmd: 'cmd', args: ['/c', 'start', '""', url] };
+  // start toma el primer argumento entre comillas como título de la ventana: va uno vacío.
+  if (platform === 'win32') return { cmd: 'cmd', args: ['/c', 'start', '', url] };
   if (platform === 'darwin') return { cmd: 'open', args: [url] };
   if (platform === 'linux') return { cmd: 'xdg-open', args: [url] };
   return null;
@@ -64,4 +66,45 @@ export function installWarningFilter(): void {
     if (warning.name === 'ExperimentalWarning' && /SQLite/.test(warning.message)) return;
     console.warn(`${warning.name}: ${warning.message}`);
   });
+}
+
+/** Si se abre el navegador al arrancar. El acceso directo de inicio de Windows usa --sin-navegador. */
+export function wantsBrowser(argv: string[], env: NodeJS.ProcessEnv): boolean {
+  return !argv.includes('--sin-navegador') && env.DSMN_NO_BROWSER !== '1';
+}
+
+/** ¿Ya hay un DontStopMeNow escuchando en ese puerto de esta compu? */
+export async function isRunningServer(port: number, fetchFn: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const res = await fetchFn(`http://127.0.0.1:${port}/api/catalog`, { signal: AbortSignal.timeout(2000) });
+    if (res.status !== 200) return false;
+    const body = (await res.json()) as { serverId?: unknown } | null;
+    return typeof body?.serverId === 'string';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Abierto con doble clic en Windows, la consola se cierra al salir y el mensaje de error
+ * no llega a leerse: en ese caso se espera un Enter.
+ */
+export function shouldWaitForEnter(opts: {
+  isSea: boolean;
+  platform: NodeJS.Platform;
+  isTTY: boolean | undefined;
+}): boolean {
+  return opts.isSea && opts.platform === 'win32' && opts.isTTY === true;
+}
+
+/** Muestra el error a quien abrió el programa y termina. */
+export async function exitWithError(message: string): Promise<never> {
+  console.error(message);
+  if (shouldWaitForEnter({ isSea: isSea(), platform: process.platform, isTTY: process.stdin.isTTY })) {
+    console.error('Presioná Enter para cerrar.');
+    const rl = createInterface({ input: process.stdin });
+    await new Promise<void>((resolve) => rl.once('line', () => resolve()));
+    rl.close();
+  }
+  process.exit(1);
 }

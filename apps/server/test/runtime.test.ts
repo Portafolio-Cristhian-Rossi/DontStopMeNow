@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { browserCommand, installWarningFilter, startupErrorMessage, webDirFor } from '../src/runtime.ts';
+import {
+  browserCommand,
+  installWarningFilter,
+  isRunningServer,
+  shouldWaitForEnter,
+  startupErrorMessage,
+  wantsBrowser,
+  webDirFor,
+} from '../src/runtime.ts';
 
 describe('webDirFor', () => {
   it('empaquetado como SEA: web junto al ejecutable, aunque la ruta tenga espacios y tildes', () => {
@@ -57,7 +65,8 @@ describe('browserCommand', () => {
   it('por plataforma', () => {
     expect(browserCommand('win32', 'http://localhost:4747')).toEqual({
       cmd: 'cmd',
-      args: ['/c', 'start', '""', 'http://localhost:4747'],
+      // Un argumento vacío llega a cmd como "" (el título de la ventana que espera start).
+      args: ['/c', 'start', '', 'http://localhost:4747'],
     });
     expect(browserCommand('darwin', 'http://x')).toEqual({ cmd: 'open', args: ['http://x'] });
     expect(browserCommand('linux', 'http://x')).toEqual({ cmd: 'xdg-open', args: ['http://x'] });
@@ -84,5 +93,40 @@ describe('installWarningFilter', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toContain('Otro aviso');
     warn.mockRestore();
+  });
+});
+
+describe('cerrar la ventana con un error', () => {
+  it('solo espera Enter en el ejecutable de Windows abierto con doble clic', () => {
+    expect(shouldWaitForEnter({ isSea: true, platform: 'win32', isTTY: true })).toBe(true);
+    expect(shouldWaitForEnter({ isSea: false, platform: 'win32', isTTY: true })).toBe(false);
+    expect(shouldWaitForEnter({ isSea: true, platform: 'linux', isTTY: true })).toBe(false);
+    expect(shouldWaitForEnter({ isSea: true, platform: 'win32', isTTY: false })).toBe(false);
+  });
+});
+
+describe('wantsBrowser', () => {
+  it('se puede desactivar con --sin-navegador o DSMN_NO_BROWSER', () => {
+    expect(wantsBrowser(['node', 'x'], {})).toBe(true);
+    expect(wantsBrowser(['DontStopMeNow.exe', '--sin-navegador'], {})).toBe(false);
+    expect(wantsBrowser(['x'], { DSMN_NO_BROWSER: '1' })).toBe(false);
+  });
+});
+
+describe('isRunningServer', () => {
+  const fetchReturning = (status: number, body: unknown) =>
+    (async () => ({ status, json: async () => body })) as unknown as typeof fetch;
+
+  it('reconoce un DontStopMeNow que ya está escuchando en el puerto', async () => {
+    expect(await isRunningServer(4747, fetchReturning(200, { serverId: 'abc', tracks: [] }))).toBe(true);
+  });
+
+  it('otro programa en el puerto no cuenta', async () => {
+    expect(await isRunningServer(4747, fetchReturning(200, { hola: 1 }))).toBe(false);
+    expect(await isRunningServer(4747, fetchReturning(404, {}))).toBe(false);
+    const failing = (async () => {
+      throw new Error('ECONNREFUSED');
+    }) as unknown as typeof fetch;
+    expect(await isRunningServer(4747, failing)).toBe(false);
   });
 });

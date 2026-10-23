@@ -11,7 +11,14 @@ import { buildApp } from './http/app.ts';
 import { publishService } from './net/discovery.ts';
 import { getLanUrls, startupMessage } from './net/lanUrls.ts';
 import { createPairing } from './pairing/pairing.ts';
-import { BUNDLED, browserCommand, startupErrorMessage } from './runtime.ts';
+import {
+  BUNDLED,
+  browserCommand,
+  exitWithError,
+  isRunningServer,
+  startupErrorMessage,
+  wantsBrowser,
+} from './runtime.ts';
 import { createScanner } from './scan/scanner.ts';
 import { createWatcher } from './scan/watcher.ts';
 
@@ -46,18 +53,20 @@ export async function main(): Promise<void> {
   try {
     await app.listen({ host: '0.0.0.0', port: config.port });
   } catch (err) {
-    console.error(startupErrorMessage(err, config.port));
     await watcher.close();
     db.close();
-    process.exit(1);
+    // Doble clic con el programa ya abierto: se abre la web del que ya está andando.
+    if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE' && (await isRunningServer(config.port))) {
+      console.log(`DontStopMeNow ya está abierto en http://localhost:${config.port}`);
+      openBrowser(config.port);
+      process.exit(0);
+    }
+    return exitWithError(startupErrorMessage(err, config.port));
   }
   console.log(startupMessage(config.port, getLanUrls(config.port)));
   console.log(`Datos en ${config.dataDir}`);
 
-  if (BUNDLED && process.platform === 'win32' && process.env.DSMN_NO_BROWSER !== '1') {
-    const open = browserCommand(process.platform, `http://localhost:${config.port}`);
-    if (open) spawn(open.cmd, open.args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
-  }
+  openBrowser(config.port);
 
   scanner
     .scanAll()
@@ -80,6 +89,13 @@ export async function main(): Promise<void> {
   }
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+}
+
+/** En el ejecutable de Windows se abre la web solo, salvo con --sin-navegador o DSMN_NO_BROWSER=1. */
+function openBrowser(port: number): void {
+  if (!BUNDLED || process.platform !== 'win32' || !wantsBrowser(process.argv, process.env)) return;
+  const open = browserCommand(process.platform, `http://localhost:${port}`);
+  if (open) spawn(open.cmd, open.args, { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
 // Con `tsx src/main.ts` arranca acá; en el build empaquetado lo arranca entry.ts.

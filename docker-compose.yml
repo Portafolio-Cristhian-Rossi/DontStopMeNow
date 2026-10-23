@@ -5,8 +5,12 @@ services:
     # gestión (que solo responde a pedidos locales) funcione al abrir http://localhost:4747 en esta máquina.
     network_mode: host
     volumes:
-      # Datos del servidor (biblioteca, listas, celulares vinculados).
-      - ./data:/data
+      # Datos del servidor (biblioteca, listas, celulares vinculados). Volumen con nombre: Docker lo crea
+      # con los permisos del usuario del contenedor, cosa que una carpeta del host no garantiza.
+      - dsmn-data:/data
       # Cambiá la ruta de la izquierda por tu carpeta de música; en la web agregala como /music.
       - /ruta/a/tu/musica:/music:ro
     restart: unless-stopped
+
+volumes:
+  dsmn-data:
