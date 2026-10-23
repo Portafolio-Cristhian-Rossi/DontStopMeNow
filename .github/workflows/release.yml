@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            bin: DontStopMeNow.exe
+          - os: ubuntu-latest
+            name: linux-x64
+            bin: DontStopMeNow
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run package
+      - name: Prueba de humo
+        run: node scripts/smoke.mjs release/DontStopMeNow-${{ matrix.name }}/${{ matrix.bin }}
+      - name: Comprimir (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path release/DontStopMeNow-${{ matrix.name }} -DestinationPath DontStopMeNow-${{ matrix.name }}.zip
+      - name: Comprimir (Linux)
+        if: runner.os == 'Linux'
+        run: cd release && zip -qr ../DontStopMeNow-${{ matrix.name }}.zip DontStopMeNow-${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DontStopMeNow-${{ matrix.name }}
+          path: DontStopMeNow-${{ matrix.name }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true
