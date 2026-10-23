@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/coverage/**',
       '**/dist/**',
+      'release/**',
       '**/.expo/**',
       '**/.expo-export/**',
       'apps/mobile/expo-env.d.ts',
