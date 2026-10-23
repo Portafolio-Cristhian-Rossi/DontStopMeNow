@@ -10,11 +10,13 @@ import type { Scanner } from '../scan/scanner.ts';
 import { buildDownloadArgs, numberWidthFor } from './recipe.ts';
 import {
   createSource,
+  deleteJob,
   findSourceByPlaylistId,
   getJob,
   getSource,
   insertJob,
   nextRunnableJob,
+  resetInterrupted,
   setItem,
   setJobStatus,
   setSourcePlaylist,
@@ -26,6 +28,11 @@ import type { DownloadProgress, YtDlp } from './ytdlp.ts';
 const PAUSE_MS = 5000;
 /** Como mucho un evento de progreso cada 250 ms por trabajo. */
 const PROGRESS_EVERY_MS = 250;
+/** Fallas seguidas por límite de YouTube que pausan el trabajo. */
+const LIMIT_STREAK = 3;
+const RATE_LIMITED = /HTTP Error 429|Sign in to confirm/;
+const LIMIT_REASON = 'YouTube está limitando las descargas: esperá un rato o actualizá yt-dlp';
+const OFFLINE_REASON = 'La carpeta de destino no está conectada';
 
 export interface DownloadQueue {
   enqueue(req: EnqueueRequest): DownloadJob;
@@ -115,28 +122,32 @@ export function createDownloadQueue(o: {
     }
   }
 
+  const tempDirOf = (jobId: number) => path.join(o.tempRoot, String(jobId));
+
+  function pause(jobId: number, reason: string) {
+    setJobStatus(db, jobId, 'paused', reason);
+    emit(jobId);
+  }
+
   async function runJob(job: StoredJob) {
     const ytdlp = o.ytdlp();
     const base = rootPath(job.rootId);
     const dest = base === undefined ? null : resolveRelDir(base, job.folder);
-    if (!ytdlp || !dest) {
-      setJobStatus(
-        db,
-        job.id,
-        'paused',
-        ytdlp ? 'La carpeta de destino no existe' : 'Configurá yt-dlp en Ajustes',
-      );
-      emit(job.id);
-      return;
-    }
+    if (!ytdlp) return pause(job.id, 'Configurá yt-dlp en Ajustes');
+    if (!dest) return pause(job.id, 'La carpeta de destino no existe');
     setJobStatus(db, job.id, 'running');
     emit(job.id);
-    const tempDir = path.join(o.tempRoot, String(job.id));
-    mkdirSync(dest.abs, { recursive: true });
-    mkdirSync(tempDir, { recursive: true });
+    const tempDir = tempDirOf(job.id);
+    let limitStreak = 0;
 
     for (const item of job.items) {
       if (item.status !== 'pending') continue;
+      // Lo que pudo cambiar mientras bajaba la anterior: cancelado, raíz quitada o desconectada.
+      if (getJob(db, job.id)?.status !== 'running') return;
+      if (rootStatus(job.rootId) === 'offline') return pause(job.id, OFFLINE_REASON);
+      mkdirSync(dest.abs, { recursive: true });
+      mkdirSync(tempDir, { recursive: true });
+
       setItem(db, job.id, item.videoId, { status: 'downloading', error: null });
       emit(job.id, { videoId: item.videoId, title: item.title, progress: { stage: 'download', percent: 0 } });
       const controller = new AbortController();
@@ -154,25 +165,44 @@ export function createDownloadQueue(o: {
           (p) => emitProgress(job.id, item.videoId, item.title, p),
           controller.signal,
         );
+        limitStreak = 0;
         setItem(db, job.id, item.videoId, { status: 'done', filePath });
         emit(job.id);
         await wait(PAUSE_MS);
       } catch (err) {
-        setItem(db, job.id, item.videoId, {
-          status: 'failed',
-          error: err instanceof Error ? err.message : String(err),
-        });
+        // Cancelar ya dejó la base como corresponde; apagar deja la canción "downloading" para retomarla.
+        if (controller.signal.aborted) return;
+        const message = err instanceof Error ? err.message : String(err);
+        limitStreak = RATE_LIMITED.test(message) ? limitStreak + 1 : 0;
+        if (limitStreak >= LIMIT_STREAK) {
+          setItem(db, job.id, item.videoId, { status: 'pending', error: null });
+          return pause(job.id, LIMIT_REASON);
+        }
+        setItem(db, job.id, item.videoId, { status: 'failed', error: message });
         emit(job.id);
       } finally {
         current = null;
       }
     }
 
+    if (!started || getJob(db, job.id)?.status !== 'running') return;
     await finish(job);
     setJobStatus(db, job.id, 'done');
     rmSync(tempDir, { recursive: true, force: true });
     lastProgress.delete(job.id);
     emit(job.id);
+  }
+
+  function rootStatus(rootId: number): string | undefined {
+    const row = db.prepare('SELECT status FROM roots WHERE id = ?').get(rootId) as
+      { status: string } | undefined;
+    return row?.status;
+  }
+
+  function existingJob(jobId: number): StoredJob {
+    const job = getJob(db, jobId);
+    if (!job) throw new HttpError(404, 'not_found', 'Descarga inexistente');
+    return job;
   }
 
   async function run() {
@@ -198,10 +228,6 @@ export function createDownloadQueue(o: {
     if (raw === '') return req.kind === 'playlist' ? sanitizeFolderName(req.title) : '';
     return sanitizeFolderName(raw);
   }
-
-  const pending = () => {
-    throw new Error('pendiente');
-  };
 
   return {
     enqueue(req) {
@@ -246,6 +272,8 @@ export function createDownloadQueue(o: {
     },
 
     start() {
+      resetInterrupted(db);
+      rmSync(o.tempRoot, { recursive: true, force: true });
       started = true;
       kick();
     },
@@ -256,10 +284,53 @@ export function createDownloadQueue(o: {
       await loop;
     },
 
-    cancel: pending,
-    resume: pending,
-    retry: pending,
-    remove: pending,
+    cancel(jobId) {
+      const job = existingJob(jobId);
+      if (job.status === 'done' || job.status === 'cancelled') {
+        throw new HttpError(409, 'conflict', 'El trabajo ya terminó');
+      }
+      for (const item of job.items) {
+        if (item.status === 'pending' || item.status === 'downloading') {
+          setItem(db, jobId, item.videoId, { status: 'cancelled' });
+        }
+      }
+      setJobStatus(db, jobId, 'cancelled');
+      if (current?.jobId === jobId) current.controller.abort();
+      rmSync(tempDirOf(jobId), { recursive: true, force: true });
+      emit(jobId);
+    },
+
+    resume(jobId) {
+      if (existingJob(jobId).status !== 'paused') {
+        throw new HttpError(409, 'conflict', 'El trabajo no está pausado');
+      }
+      setJobStatus(db, jobId, 'pending');
+      emit(jobId);
+      kick();
+    },
+
+    retry(jobId) {
+      const job = existingJob(jobId);
+      if (job.status === 'running') {
+        throw new HttpError(409, 'conflict', 'Esperá a que termine para reintentar');
+      }
+      for (const item of job.items) {
+        if (item.status === 'failed' || item.status === 'cancelled') {
+          setItem(db, jobId, item.videoId, { status: 'pending', error: null });
+        }
+      }
+      setJobStatus(db, jobId, 'pending');
+      emit(jobId);
+      kick();
+    },
+
+    remove(jobId) {
+      const job = existingJob(jobId);
+      if (job.status === 'running' || job.status === 'paused') {
+        throw new HttpError(409, 'conflict', 'Cancelá la descarga antes de quitarla');
+      }
+      deleteJob(db, jobId);
+    },
 
     busy: () => current !== null,
 

@@ -1,10 +1,10 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { DownloadEvent, EnqueueRequest } from '@dsmn/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDownloadQueue, type DownloadQueue } from '../../src/downloads/queue.ts';
-import { getJob, listSources } from '../../src/downloads/store.ts';
+import { getJob, listJobs, listSources, setItem, setJobStatus } from '../../src/downloads/store.ts';
 import { createYtDlp, type YtDlp } from '../../src/downloads/ytdlp.ts';
 import { EventBus } from '../../src/events.ts';
 import { addRootRow, makeDb, tmpDir } from '../helpers/fixtures.ts';
@@ -173,6 +173,141 @@ describe('cola de descargas', () => {
     expect(events.every((e) => e.jobId === job.id && e.total === 2)).toBe(true);
     expect(events.some((e) => e.status === 'running' && e.current?.title === 'Canción ok1')).toBe(true);
     expect(events.at(-1)).toMatchObject({ status: 'done', done: 2, failed: 0, current: null });
+  });
+
+  it('cancelar mata la canción en curso y deja el resto cancelado', async () => {
+    const job = q.enqueue(req({ items: [item('hang1', 1), item('ok1', 2)] }));
+    await vi.waitFor(() => expect(downloadedIds(fake)).toEqual(['hang1']));
+    expect(q.busy()).toBe(true);
+    q.cancel(job.id);
+    await q.idle();
+    expect(getJob(db, job.id)).toMatchObject({
+      status: 'cancelled',
+      finishedAt: expect.any(Number),
+      items: [{ status: 'cancelled' }, { status: 'cancelled' }],
+    });
+    expect(downloadedIds(fake)).toEqual(['hang1']);
+    expect(existsSync(join(tempRoot, String(job.id)))).toBe(false);
+    expect(q.busy()).toBe(false);
+  });
+
+  it('cancelar un trabajo en espera no lo baja; uno terminado → 409; inexistente → 404', async () => {
+    await q.stop();
+    const job = q.enqueue(req());
+    q.cancel(job.id);
+    expect(getJob(db, job.id)).toMatchObject({ status: 'cancelled', items: [{ status: 'cancelled' }] });
+    q.start();
+    await q.idle();
+    expect(downloadedIds(fake)).toEqual([]);
+    expect(() => q.cancel(job.id)).toThrow(status(409));
+    expect(() => q.cancel(999)).toThrow(status(404));
+  });
+
+  it('3 fallas seguidas por límite pausan el trabajo y siguen con el próximo', async () => {
+    const a = q.enqueue(
+      req({ items: [item('limit1', 1), item('limit2', 2), item('limit3', 3), item('ok4', 4)] }),
+    );
+    const b = q.enqueue(
+      req({ kind: 'video', ytPlaylistId: null, folder: '', playlistSize: 1, items: [item('ok9', null)] }),
+    );
+    await q.idle();
+    expect(getJob(db, a.id)).toMatchObject({
+      status: 'paused',
+      pauseReason: 'YouTube está limitando las descargas: esperá un rato o actualizá yt-dlp',
+    });
+    expect(getJob(db, a.id)!.items.map((i) => i.status)).toEqual(['failed', 'failed', 'pending', 'pending']);
+    expect(getJob(db, b.id)!.status).toBe('done');
+  });
+
+  it('una falla que no es por límite corta la racha', async () => {
+    const job = q.enqueue(
+      req({
+        items: [item('limit1', 1), item('limit2', 2), item('fail3', 3), item('limit4', 4), item('ok5', 5)],
+      }),
+    );
+    await q.idle();
+    expect(getJob(db, job.id)!.status).toBe('done');
+  });
+
+  it('raíz desconectada pausa y resume retoma', async () => {
+    db.prepare("UPDATE roots SET status = 'offline' WHERE id = ?").run(rootId);
+    const job = q.enqueue(req());
+    await q.idle();
+    expect(getJob(db, job.id)).toMatchObject({
+      status: 'paused',
+      pauseReason: 'La carpeta de destino no está conectada',
+      items: [{ status: 'pending' }],
+    });
+    expect(() => q.resume(job.id + 100)).toThrow(status(404));
+    db.prepare("UPDATE roots SET status = 'online' WHERE id = ?").run(rootId);
+    q.resume(job.id);
+    await q.idle();
+    expect(getJob(db, job.id)).toMatchObject({
+      status: 'done',
+      pauseReason: null,
+      items: [{ status: 'done' }],
+    });
+    expect(() => q.resume(job.id)).toThrow(status(409));
+  });
+
+  it('retry vuelve a intentar solo las fallidas', async () => {
+    const job = q.enqueue(req({ items: [item('fail1', 1), item('ok1', 2)] }));
+    await q.idle();
+    q.retry(job.id);
+    await q.idle();
+    expect(downloadedIds(fake)).toEqual(['fail1', 'ok1', 'fail1']);
+    expect(getJob(db, job.id)).toMatchObject({
+      status: 'done',
+      items: [{ status: 'failed' }, { status: 'done' }],
+    });
+  });
+
+  it('stop deja la canción interrumpida para retomarla, sin marcarla fallida', async () => {
+    const job = q.enqueue(req({ items: [item('hang1', 1), item('ok1', 2)] }));
+    await vi.waitFor(() => expect(downloadedIds(fake)).toEqual(['hang1']));
+    await q.stop();
+    expect(getJob(db, job.id)).toMatchObject({
+      status: 'running',
+      items: [{ status: 'downloading', error: null }, { status: 'pending' }],
+    });
+    expect(downloadedIds(fake)).toEqual(['hang1']);
+  });
+
+  it('al arrancar retoma lo interrumpido y limpia los temporales', async () => {
+    await q.stop();
+    const job = q.enqueue(req({ items: [item('ok1', 1)] }));
+    setJobStatus(db, job.id, 'running');
+    setItem(db, job.id, 'ok1', { status: 'downloading' });
+    mkdirSync(join(tempRoot, 'viejo'), { recursive: true });
+    q = makeQueue();
+    q.start();
+    expect(existsSync(join(tempRoot, 'viejo'))).toBe(false);
+    await q.idle();
+    expect(getJob(db, job.id)).toMatchObject({ status: 'done', items: [{ status: 'done' }] });
+  });
+
+  it('remove no deja quitar un trabajo en curso', async () => {
+    const job = q.enqueue(req({ items: [item('hang1', 1)] }));
+    await vi.waitFor(() => expect(getJob(db, job.id)!.items[0]!.status).toBe('downloading'));
+    expect(() => q.remove(job.id)).toThrow(status(409));
+    q.cancel(job.id);
+    await q.idle();
+    q.remove(job.id);
+    expect(getJob(db, job.id)).toBeUndefined();
+    expect(listJobs(db)).toEqual([]);
+  });
+
+  it('quitar la raíz con un trabajo en espera no rompe la cola', async () => {
+    await q.stop();
+    const otherRoot = await tmpDir();
+    const otherId = addRootRow(db, otherRoot);
+    q.enqueue(req());
+    const b = q.enqueue(req({ rootId: otherId, ytPlaylistId: 'PL2', items: [item('ok2', 1)] }));
+    db.prepare('DELETE FROM roots WHERE id = ?').run(rootId);
+    q.start();
+    await q.idle();
+    expect(listJobs(db).map((j) => [j.id, j.status])).toEqual([[b.id, 'done']]);
+    expect(existsSync(join(otherRoot, 'Fake Playlist', '01 - Canción ok2.mp3'))).toBe(true);
   });
 
   it('numera con tres dígitos las playlists de más de 99 videos', async () => {
