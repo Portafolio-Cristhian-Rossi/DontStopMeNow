@@ -4,6 +4,7 @@ import { api } from '../api/client.ts';
 import { useScanStatus } from '../api/events.ts';
 import { queryKeys, useIssues, useRoots } from '../api/queries.ts';
 import { SystemFolderDialog } from '../components/SystemFolderDialog.tsx';
+import { YtDlpSettings } from '../components/YtDlpSettings.tsx';
 
 /** Limpia una ruta pegada desde el Explorador: espacios y comillas en los extremos. */
 export function cleanPath(input: string): string {
@@ -140,6 +141,8 @@ export function SettingsPage() {
               : 'El servidor vigila las carpetas y escanea solo cuando algo cambia.'}
         </span>
       </div>
+
+      <YtDlpSettings />
 
       <h2>Archivos con problemas</h2>
       {issues.data?.length ? (

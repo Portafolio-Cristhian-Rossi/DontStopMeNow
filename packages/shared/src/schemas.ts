@@ -160,3 +160,139 @@ export const ScanStatusSchema = z.object({
   total: z.number().int(),
 });
 export type ScanStatus = z.infer<typeof ScanStatusSchema>;
+
+// --- Descargas desde YouTube ---
+
+export const YtDlpStatusSchema = z.object({
+  path: z.string().nullable(),
+  version: z.string().nullable(),
+  ffmpeg: z.boolean(),
+  suggestedPath: z.string().nullable(),
+  error: z.string().nullable(),
+});
+export type YtDlpStatus = z.infer<typeof YtDlpStatusSchema>;
+
+export const SetYtDlpPathRequestSchema = z.object({ path: z.string().min(1) });
+export type SetYtDlpPathRequest = z.infer<typeof SetYtDlpPathRequestSchema>;
+
+export const YtDlpUpdateResponseSchema = z.object({ version: z.string(), output: z.string() });
+export type YtDlpUpdateResponse = z.infer<typeof YtDlpUpdateResponseSchema>;
+
+export const PreviewRequestSchema = z.object({
+  url: z.string().refine((u) => /^https?:\/\//i.test(u.trim()), {
+    message: 'El link tiene que empezar con http:// o https://',
+  }),
+});
+export type PreviewRequest = z.infer<typeof PreviewRequestSchema>;
+
+export const PreviewEntrySchema = z.object({
+  videoId: z.string(),
+  url: z.string(),
+  title: z.string(),
+  channel: z.string().nullable(),
+  durationSec: z.number().nullable(),
+  position: z.number().int().nullable(),
+  unavailable: z.boolean(),
+});
+export type PreviewEntry = z.infer<typeof PreviewEntrySchema>;
+
+export const AnalyzedEntrySchema = PreviewEntrySchema.extend({
+  duplicateOf: z.string().nullable(),
+  inLibrary: z.string().nullable(),
+  versionGroup: z.string().nullable(),
+  versionTags: z.array(z.string()),
+  alreadyDownloaded: z.boolean(),
+  selected: z.boolean(),
+});
+export type AnalyzedEntry = z.infer<typeof AnalyzedEntrySchema>;
+
+export const DownloadKindSchema = z.enum(['playlist', 'video']);
+export type DownloadKind = z.infer<typeof DownloadKindSchema>;
+
+export const PreviewSchema = z.object({
+  kind: DownloadKindSchema,
+  ytPlaylistId: z.string().nullable(),
+  title: z.string(),
+  url: z.string(),
+  playlistSize: z.number().int(),
+  sourceId: z.number().int().nullable(),
+  destination: z.object({ rootId: z.number().int(), folder: z.string() }).nullable(),
+  entries: z.array(AnalyzedEntrySchema),
+});
+export type Preview = z.infer<typeof PreviewSchema>;
+
+export const EnqueueRequestSchema = z.object({
+  url: z.string(),
+  title: z.string(),
+  kind: DownloadKindSchema,
+  ytPlaylistId: z.string().nullable(),
+  playlistSize: z.number().int().min(1),
+  rootId: z.number().int(),
+  folder: z.string(),
+  items: z
+    .array(z.object({ videoId: z.string(), position: z.number().int().nullable(), title: z.string() }))
+    .min(1),
+});
+export type EnqueueRequest = z.infer<typeof EnqueueRequestSchema>;
+
+export const DownloadJobStatusSchema = z.enum(['pending', 'running', 'paused', 'done', 'cancelled']);
+export type DownloadJobStatus = z.infer<typeof DownloadJobStatusSchema>;
+
+export const DownloadItemStatusSchema = z.enum(['pending', 'downloading', 'done', 'failed', 'cancelled']);
+export type DownloadItemStatus = z.infer<typeof DownloadItemStatusSchema>;
+
+export const DownloadItemSchema = z.object({
+  videoId: z.string(),
+  position: z.number().int().nullable(),
+  title: z.string(),
+  status: DownloadItemStatusSchema,
+  error: z.string().nullable(),
+  filePath: z.string().nullable(),
+});
+export type DownloadItem = z.infer<typeof DownloadItemSchema>;
+
+export const DownloadJobSchema = z.object({
+  id: z.number().int(),
+  sourceId: z.number().int().nullable(),
+  url: z.string(),
+  title: z.string(),
+  rootId: z.number().int(),
+  folder: z.string(),
+  status: DownloadJobStatusSchema,
+  pauseReason: z.string().nullable(),
+  createdAt: z.number().int(),
+  finishedAt: z.number().int().nullable(),
+  items: z.array(DownloadItemSchema),
+});
+export type DownloadJob = z.infer<typeof DownloadJobSchema>;
+
+export const YtSourceSchema = z.object({
+  id: z.number().int(),
+  url: z.string(),
+  ytPlaylistId: z.string(),
+  title: z.string(),
+  rootId: z.number().int(),
+  folder: z.string(),
+  playlistId: z.string().nullable(),
+  downloaded: z.number().int(),
+  createdAt: z.number().int(),
+  lastCheckedAt: z.number().int().nullable(),
+});
+export type YtSource = z.infer<typeof YtSourceSchema>;
+
+export const DownloadEventSchema = z.object({
+  jobId: z.number().int(),
+  status: DownloadJobStatusSchema,
+  done: z.number().int(),
+  failed: z.number().int(),
+  total: z.number().int(),
+  current: z
+    .object({
+      videoId: z.string(),
+      title: z.string(),
+      stage: z.enum(['download', 'convert']),
+      percent: z.number().nullable(),
+    })
+    .nullable(),
+});
+export type DownloadEvent = z.infer<typeof DownloadEventSchema>;

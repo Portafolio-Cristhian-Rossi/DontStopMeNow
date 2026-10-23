@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { albumId, normalizeKey } from '../src/index.ts';
+import { albumId, normalizeKey, sanitizeFolderName } from '../src/index.ts';
 
 describe('normalizeKey', () => {
   it('pasa a minúsculas, colapsa y recorta espacios', () => {
@@ -19,5 +19,14 @@ describe('albumId', () => {
   });
   it('distingue artista de álbum', () => {
     expect(albumId('ab', 'c')).not.toBe(albumId('a', 'bc'));
+  });
+});
+
+describe('sanitizeFolderName', () => {
+  it('deja nombres válidos en Windows', () => {
+    expect(sanitizeFolderName('AC/DC: Hits?')).toBe('AC_DC_ Hits_');
+    expect(sanitizeFolderName('  Mix  de   verano. ')).toBe('Mix de verano');
+    expect(sanitizeFolderName('..')).toBe('Descargas');
+    expect(sanitizeFolderName('Persona 3-4-5 Best Tracks')).toBe('Persona 3-4-5 Best Tracks');
   });
 });

@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
-import type { ScanStatus } from '@dsmn/shared';
+import type { DownloadEvent, ScanStatus } from '@dsmn/shared';
 
 export interface BusEvents {
   scan: ScanStatus;
   revision: { revision: number };
+  download: DownloadEvent;
 }
 
 type Listener<K extends keyof BusEvents> = (payload: BusEvents[K]) => void;

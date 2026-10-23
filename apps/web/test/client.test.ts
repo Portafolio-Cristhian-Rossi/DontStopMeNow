@@ -27,6 +27,38 @@ describe('cliente de la API', () => {
     await expect(api.removeRoot(3)).resolves.toBeUndefined();
   });
 
+  it('rutas de descargas', async () => {
+    const server = fakeServer({
+      'POST /api/admin/downloads/preview': () => ({}),
+      'POST /api/admin/downloads/jobs/4/cancel': () => ({}),
+      'POST /api/admin/downloads/jobs/4/resume': () => ({}),
+      'POST /api/admin/downloads/jobs/4/retry': () => ({}),
+      'DELETE /api/admin/downloads/jobs/4': () => undefined,
+      'POST /api/admin/downloads/sources/2/check': () => ({}),
+      'DELETE /api/admin/downloads/sources/2': () => undefined,
+      'POST /api/admin/ytdlp/update': () => ({}),
+    });
+    await api.preview('https://youtu.be/x');
+    await api.cancelJob(4);
+    await api.resumeJob(4);
+    await api.retryJob(4);
+    await api.removeJob(4);
+    await api.checkSource(2);
+    await api.forgetSource(2);
+    await api.updateYtdlp();
+    expect(server.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      'POST /api/admin/downloads/preview',
+      'POST /api/admin/downloads/jobs/4/cancel',
+      'POST /api/admin/downloads/jobs/4/resume',
+      'POST /api/admin/downloads/jobs/4/retry',
+      'DELETE /api/admin/downloads/jobs/4',
+      'POST /api/admin/downloads/sources/2/check',
+      'DELETE /api/admin/downloads/sources/2',
+      'POST /api/admin/ytdlp/update',
+    ]);
+    expect(server.calls[0]?.body).toEqual({ url: 'https://youtu.be/x' });
+  });
+
   it('error de red', async () => {
     vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')));
     await expect(api.roots()).rejects.toMatchObject({

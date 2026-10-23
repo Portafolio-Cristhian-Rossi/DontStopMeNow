@@ -330,6 +330,74 @@ dialog {
   margin: 1rem 0 0;
 }
 
+input[type='text'].wide {
+  flex: 1;
+  min-width: 18rem;
+}
+
+.preview {
+  margin-top: 1rem;
+}
+
+.preview-head h2 {
+  margin: 0;
+}
+
+.preview-count {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.preview-table td {
+  vertical-align: top;
+}
+
+.preview details {
+  margin-top: 1rem;
+}
+
+.preview details summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.preview-actions {
+  justify-content: flex-end;
+  margin: 1rem 0 0;
+}
+
+.queue-job {
+  margin-bottom: 0.75rem;
+}
+
+.queue-job .toolbar {
+  margin-bottom: 0.25rem;
+}
+
+.queue-job details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.queue-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.badge {
+  display: inline-block;
+  margin: 0 0.25rem 0.25rem 0;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 .list-plain {
   list-style: none;
   padding: 0;

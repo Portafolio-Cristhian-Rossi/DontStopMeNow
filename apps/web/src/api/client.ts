@@ -3,14 +3,20 @@ import type {
   Catalog,
   CreatePlaylistRequest,
   Device,
+  DownloadJob,
+  EnqueueRequest,
   ErrorCode,
   FsBrowseResponse,
   FsFolder,
   PairingCodeResponse,
   Playlist,
+  Preview,
   Root,
   ScanIssue,
   UpdatePlaylistRequest,
+  YtDlpStatus,
+  YtDlpUpdateResponse,
+  YtSource,
 } from '@dsmn/shared';
 
 export class ApiRequestError extends Error {
@@ -65,6 +71,19 @@ export const api = {
   pairingCode: () => request<PairingCodeResponse>('POST', '/api/admin/pairing-code'),
   devices: () => request<Device[]>('GET', '/api/admin/devices'),
   revokeDevice: (id: string) => request<void>('DELETE', `/api/admin/devices/${encodeURIComponent(id)}`),
+  ytdlpStatus: () => request<YtDlpStatus>('GET', '/api/admin/ytdlp'),
+  setYtdlpPath: (path: string) => request<YtDlpStatus>('PUT', '/api/admin/ytdlp', { path }),
+  updateYtdlp: () => request<YtDlpUpdateResponse>('POST', '/api/admin/ytdlp/update'),
+  preview: (url: string) => request<Preview>('POST', '/api/admin/downloads/preview', { url }),
+  enqueue: (req: EnqueueRequest) => request<DownloadJob>('POST', '/api/admin/downloads/jobs', req),
+  downloadJobs: () => request<DownloadJob[]>('GET', '/api/admin/downloads/jobs'),
+  cancelJob: (id: number) => request<DownloadJob>('POST', `/api/admin/downloads/jobs/${id}/cancel`),
+  resumeJob: (id: number) => request<DownloadJob>('POST', `/api/admin/downloads/jobs/${id}/resume`),
+  retryJob: (id: number) => request<DownloadJob>('POST', `/api/admin/downloads/jobs/${id}/retry`),
+  removeJob: (id: number) => request<void>('DELETE', `/api/admin/downloads/jobs/${id}`),
+  ytSources: () => request<YtSource[]>('GET', '/api/admin/downloads/sources'),
+  checkSource: (id: number) => request<Preview>('POST', `/api/admin/downloads/sources/${id}/check`),
+  forgetSource: (id: number) => request<void>('DELETE', `/api/admin/downloads/sources/${id}`),
 };
 
 export const coverUrl = (id: string) => `/api/covers/${encodeURIComponent(id)}`;

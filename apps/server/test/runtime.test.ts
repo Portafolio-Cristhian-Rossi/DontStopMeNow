@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   browserCommand,
@@ -37,16 +39,18 @@ describe('webDirFor', () => {
   });
 
   it('en desarrollo: apps/web/dist', () => {
+    // URL armada con la ruta absoluta del sistema: en Windows "file:///repo/..." (sin unidad) no es válida.
+    const repo = path.resolve('/repo');
     expect(
       webDirFor({
         bundled: false,
         isSea: false,
         execPath: '',
         scriptPath: '',
-        moduleUrl: 'file:///repo/apps/server/src/runtime.ts',
-        platform: 'linux',
+        moduleUrl: pathToFileURL(path.join(repo, 'apps', 'server', 'src', 'runtime.ts')).href,
+        platform: process.platform,
       }),
-    ).toBe('/repo/apps/web/dist');
+    ).toBe(path.join(repo, 'apps', 'web', 'dist'));
   });
 });
 

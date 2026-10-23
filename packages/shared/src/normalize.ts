@@ -6,6 +6,20 @@ export function normalizeKey(s: string): string {
   return s.normalize('NFC').toLocaleLowerCase('und').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Nombre de carpeta válido en Windows y Linux: reemplaza `< > : " / \ | ? *` y caracteres de control por "_",
+ * colapsa espacios y quita puntos y espacios del final. Si no queda nada usable, "Descargas".
+ */
+export function sanitizeFolderName(name: string): string {
+  const cleaned = name
+    // eslint-disable-next-line no-control-regex
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/, '');
+  return cleaned === '' || cleaned === '.' || cleaned === '..' ? 'Descargas' : cleaned;
+}
+
 /** ID estable de un álbum a partir de su artista y título. */
 export function albumId(albumArtist: string, album: string): string {
   const key = normalizeKey(albumArtist) + '\u0000' + normalizeKey(album);
