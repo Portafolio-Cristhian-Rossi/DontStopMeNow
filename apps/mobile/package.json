@@ -10,8 +10,11 @@
   },
   "dependencies": {
     "@dsmn/shared": "*",
+    "@expo/vector-icons": "^15.0.2",
     "@noble/hashes": "^2.4.0",
+    "@react-native-community/slider": "5.2.1",
     "expo": "~58.0.17",
+    "expo-audio": "~58.0.10",
     "expo-build-properties": "~58.0.11",
     "expo-camera": "~58.0.12",
     "expo-constants": "~58.0.13",

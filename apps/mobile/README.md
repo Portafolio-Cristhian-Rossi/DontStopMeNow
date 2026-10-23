@@ -1,7 +1,8 @@
 # App Android de DontStopMeNow
 
-Se vincula con el servidor de tu compu, te deja elegir qué álbumes y listas bajar y los guarda en el
-celular para escucharlos sin conexión. (El reproductor llega en la próxima etapa.)
+Se vincula con el servidor de tu compu, te deja elegir qué álbumes y listas bajar, los guarda en el celular
+y los reproduce sin conexión con su propio reproductor (segundo plano, pantalla de bloqueo, auriculares,
+cola, aleatorio y repetir).
 
 ## Compilar e instalar (EAS, en la nube)
 
@@ -25,6 +26,8 @@ Al terminar, EAS muestra un link y un código QR: abrilo desde el celular, desca
 2. El celular tiene que estar en el **mismo WiFi** que la compu.
 3. Abrí la app y escaneá el código QR (o ingresá la dirección y el código a mano).
 4. En **Descargas**, marcá álbumes o listas y tocá **Sincronizar**.
+5. En **Biblioteca**, tocá una canción para escucharla (o los botones **Reproducir** / **Aleatorio** de un álbum
+   o lista).
 
 ## Lista de verificación manual
 
@@ -44,6 +47,26 @@ Al terminar, EAS muestra un link y un código QR: abrilo desde el celular, desca
 - [ ] Dejar el celular sin tocar durante una sincronización larga: la pantalla no se apaga y sigue bajando.
 - [ ] Desvincular y volver a vincular el mismo servidor: lo descargado se conserva.
 - [ ] Con una biblioteca grande, la pantalla Descargas responde fluida al marcar y desmarcar.
+
+### Reproductor
+
+- [ ] Reproducir un álbum y apagar la pantalla: sigue sonando y pasa a la siguiente canción.
+- [ ] Controles en la notificación y en la pantalla de bloqueo (play/pausa, anterior, siguiente), con la
+      portada.
+- [ ] Botón de auriculares Bluetooth (play/pausa, siguiente).
+- [ ] Desconectar los auriculares: se pausa.
+- [ ] Entra una llamada: se pausa y retoma al cortar.
+- [ ] Aleatorio y repetir (no / todo / una) en la pantalla del reproductor.
+- [ ] Mantener apretada una canción: "Reproducir a continuación" y "Agregar a la cola" aparecen en la cola.
+- [ ] Cerrar la app (deslizarla de recientes) y volver: misma canción y mismo segundo, en pausa.
+- [ ] Desmarcar el álbum que está sonando y sincronizar: la canción actual sigue sonando y se borra en la
+      próxima sincronización; las demás salen de la cola.
+- [ ] Modo avión: las portadas se siguen viendo.
+- [ ] En Canciones, con miles de canciones descargadas, tocar una: empieza a sonar sin trabar la app, y el
+      reproductor y la cola responden fluido.
+- [ ] Terminar un álbum (sin repetir) y tocar play: vuelve a empezar desde la primera.
+- [ ] La primera vez que reproducís, Android pide permiso de notificaciones: aceptalo para tener los
+      controles.
 
 ## Desarrollo
 

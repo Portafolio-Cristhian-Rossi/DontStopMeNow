@@ -1,8 +1,7 @@
 # DontStopMeNow
 
 Tu propio ecosistema de música: un servidor en la compu que organiza tu biblioteca a partir de la metadata
-de los archivos, y una app Android que sincroniza los álbumes y listas que elijas para escucharlos sin
-conexión.
+de los archivos, y una app Android que sincroniza los álbumes y listas que elijas y los reproduce sin conexión.
 
 ## Cómo se usa
 

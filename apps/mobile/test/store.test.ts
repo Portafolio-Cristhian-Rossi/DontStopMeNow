@@ -68,4 +68,26 @@ describe('LocalStore', () => {
     new LocalStore(sqliteDb(raw)).setServer(server);
     expect(new LocalStore(sqliteDb(raw)).getServer()).toEqual(server);
   });
+
+  it('guarda el estado del reproductor y desvincular no lo borra', () => {
+    const raw = new DatabaseSync(':memory:');
+    const store = new LocalStore(sqliteDb(raw));
+    expect(store.getPlayerState()).toBeNull();
+    const state = {
+      queue: {
+        order: ['t2', 't1'],
+        original: ['t1', 't2'],
+        index: 1,
+        shuffle: true,
+        repeat: 'all' as const,
+        nextCount: 0,
+      },
+      positionMs: 42_000,
+    };
+    store.setPlayerState(state);
+    store.clearServer();
+    expect(new LocalStore(sqliteDb(raw)).getPlayerState()).toEqual(state);
+    store.setPlayerState(null);
+    expect(store.getPlayerState()).toBeNull();
+  });
 });

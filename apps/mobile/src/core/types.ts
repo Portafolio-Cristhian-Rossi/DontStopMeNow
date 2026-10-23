@@ -32,7 +32,10 @@ export interface SqlDb {
 /** Archivos de la app (en el celular, el almacenamiento privado; en los tests, memoria). */
 export interface FileStore {
   musicDir: string;
+  coversDir: string;
   exists(path: string): boolean;
+  /** Nombres de los archivos de una carpeta. */
+  list(dir: string): string[];
   size(path: string): number;
   read(path: string, offset: number, length: number): Promise<Uint8Array>;
   move(from: string, to: string): void;
@@ -54,3 +57,33 @@ export interface Downloader {
     signal: AbortSignal;
   }): Promise<{ status: 'done' } | { status: 'paused'; state: string }>;
 }
+
+export type EngineLoop = 'none' | 'single' | 'all';
+
+/** Motor de audio con cola nativa (en el celular, AudioPlaylist de expo-audio). */
+export interface PlayerEngine {
+  load(sources: { uri: string }[], startIndex: number, positionMs: number, autoplay: boolean): void;
+  play(): void;
+  pause(): void;
+  skipTo(index: number): void;
+  seekTo(ms: number): void;
+  setLoop(mode: EngineLoop): void;
+  insert(source: { uri: string }, index: number): void;
+  add(source: { uri: string }): void;
+  remove(index: number): void;
+  setNowPlaying(meta: { title: string; artist: string; albumTitle: string; artworkUrl?: string }): void;
+  /** Quita los controles de la notificación y la pantalla de bloqueo. */
+  clearNowPlaying(): void;
+  status(): EngineStatus;
+  onTrackChanged(cb: (index: number) => void): () => void;
+  onStatus(cb: (status: EngineStatus) => void): () => void;
+}
+
+/** `ended`: terminó la última canción de la cola (sin repetir). */
+export type EngineStatus = {
+  index: number;
+  positionMs: number;
+  durationMs: number;
+  playing: boolean;
+  ended: boolean;
+};

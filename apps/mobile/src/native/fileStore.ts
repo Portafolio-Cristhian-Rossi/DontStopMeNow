@@ -5,9 +5,21 @@ import type { FileStore } from '../core/types.ts';
 export function createFileStore(): FileStore {
   const dir = new Directory(Paths.document, 'music');
   if (!dir.exists) dir.create({ intermediates: true });
+  const covers = new Directory(Paths.document, 'covers');
+  if (!covers.exists) covers.create({ intermediates: true });
 
   return {
     musicDir: dir.uri.replace(/\/+$/, ''),
+    coversDir: covers.uri.replace(/\/+$/, ''),
+    list: (path) => {
+      const folder = new Directory(path);
+      return folder.exists
+        ? folder
+            .list()
+            .filter((e) => e instanceof File)
+            .map((e) => e.name)
+        : [];
+    },
     exists: (path) => new File(path).exists,
     size: (path) => new File(path).size ?? 0,
     async read(path, offset, length) {
