@@ -23,10 +23,10 @@ Al arrancar muestra las direcciones de la red local por las que el celular puede
 
 ### Variables de entorno
 
-| Variable        | Por defecto                                                                   | Para qué                                         |
-| --------------- | ----------------------------------------------------------------------------- | ------------------------------------------------ |
-| `DSMN_PORT`     | `4747`                                                                        | Puerto HTTP                                      |
-| `DSMN_DATA_DIR` | `%APPDATA%\DontStopMeNow` en Windows, `~/.local/share/dontstopmenow` en Linux | Base de datos (`library.db`) y caché de portadas |
+| Variable        | Por defecto                                                                   | Para qué                                                                                  |
+| --------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `DSMN_PORT`     | `4747`                                                                        | Puerto HTTP                                                                               |
+| `DSMN_DATA_DIR` | `%APPDATA%\DontStopMeNow` en Windows, `~/.local/share/dontstopmenow` en Linux | Base de datos (`library.db`), caché de portadas y `yt-tmp/` (temporales de las descargas) |
 
 ## Agregar tu carpeta de música
 
@@ -49,6 +49,27 @@ El servidor escanea la carpeta enseguida y después vigila los cambios (archivos
 
 Otras rutas útiles: `GET /api/catalog` (biblioteca completa), `GET /api/admin/issues` (archivos que no se
 pudieron leer), `POST /api/admin/scan` (reescanear todo).
+
+## Descargas desde YouTube
+
+El servidor usa tu `yt-dlp` (la ruta se guarda desde la web, en Ajustes) y el `ffmpeg` del `PATH`. Baja de a una
+canción, con 5 s de pausa entre canciones, y retoma lo pendiente al reiniciar. Cada canción se baja primero en
+`<datos>/yt-tmp/` y solo el `.mp3` terminado llega a la carpeta de música. Si YouTube empieza a limitar (3 errores
+429 seguidos), el trabajo se pausa solo.
+
+Rutas (solo desde la compu):
+
+| Ruta                                                           | Qué hace                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------- |
+| `GET/PUT /api/admin/ytdlp`, `POST /api/admin/ytdlp/update`     | Ruta y versión de yt-dlp, ffmpeg; `yt-dlp -U`           |
+| `POST /api/admin/downloads/preview` `{ url }`                  | Lista los videos del link con los duplicados marcados   |
+| `GET/POST /api/admin/downloads/jobs`                           | Cola; encolar las canciones elegidas                    |
+| `POST /api/admin/downloads/jobs/:id/{cancel,resume,retry}`     | Cancelar, reanudar uno pausado, reintentar las fallidas |
+| `DELETE /api/admin/downloads/jobs/:id`                         | Quitar de la cola (no borra archivos)                   |
+| `GET /api/admin/downloads/sources`, `POST …/sources/:id/check` | Playlists guardadas; buscar lo nuevo                    |
+| `DELETE /api/admin/downloads/sources/:id`                      | Olvidar una playlist (no borra archivos ni la lista)    |
+
+El progreso llega en vivo por `GET /api/admin/events` (evento `download`).
 
 ## Firewall de Windows
 

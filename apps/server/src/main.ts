@@ -1,13 +1,18 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Bonjour } from 'bonjour-service';
 import { loadConfig } from './config.ts';
 import { openDatabase } from './db/database.ts';
 import { ensureServerId } from './db/meta.ts';
+import { createDownloadQueue } from './downloads/queue.ts';
+import { createYtDlpSettings, findOnPath } from './downloads/settings.ts';
+import { createYtDlp, jsRuntimeFor } from './downloads/ytdlp.ts';
 import { EventBus } from './events.ts';
 import { buildApp } from './http/app.ts';
+import { listRoots } from './library/roots.ts';
 import { publishService } from './net/discovery.ts';
 import { getLanUrls, startupMessage } from './net/lanUrls.ts';
 import { createPairing } from './pairing/pairing.ts';
@@ -33,6 +38,24 @@ export async function main(): Promise<void> {
   const scanner = createScanner({ db, bus, coversDir: config.coversDir });
   const watcher = createWatcher({ db, scanner });
 
+  const jsRuntime = jsRuntimeFor({ bundled: BUNDLED, execPath: process.execPath, findOnPath });
+  const ytdlpSettings = createYtDlpSettings({
+    db,
+    roots: () => listRoots(db),
+    findOnPath: (name) => findOnPath(name),
+    exists: existsSync,
+    makeYtDlp: (command) => createYtDlp({ command, jsRuntime }),
+  });
+  const downloadQueue = createDownloadQueue({
+    db,
+    bus,
+    scanner,
+    ytdlp: () => ytdlpSettings.current(),
+    ffmpeg: () => findOnPath('ffmpeg') !== null,
+    tempRoot: path.join(config.dataDir, 'yt-tmp'),
+    log: (err, msg) => app.log.error(err, msg),
+  });
+
   const app = buildApp(
     {
       db,
@@ -45,6 +68,7 @@ export async function main(): Promise<void> {
       lanUrls: () => getLanUrls(config.port),
       onRootsChanged: () =>
         void watcher.sync().catch((err) => app.log.error(err, 'No se pudo vigilar las carpetas')),
+      downloads: { settings: ytdlpSettings, queue: downloadQueue },
     },
     // Empaquetado, la consola solo muestra problemas: el registro de cada pedido no le sirve a quien usa el programa.
     { logger: BUNDLED ? { level: 'warn' } : true },
@@ -65,6 +89,8 @@ export async function main(): Promise<void> {
   }
   console.log(startupMessage(config.port, getLanUrls(config.port)));
   console.log(`Datos en ${config.dataDir}`);
+  // Retoma las descargas que quedaron a medias; app.close() la detiene (hook onClose de las rutas de descargas).
+  downloadQueue.start();
 
   openBrowser(config.port);
 

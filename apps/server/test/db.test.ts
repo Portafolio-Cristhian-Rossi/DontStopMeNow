@@ -1,3 +1,4 @@
+import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { migrate } from '../src/db/database.ts';
 import { ensureServerId, getRevision } from '../src/db/meta.ts';
@@ -11,6 +12,20 @@ describe('base de datos', () => {
     const db = makeDb();
     migrate(db);
     expect({ ...db.prepare('PRAGMA user_version').get() }).toEqual({ user_version: MIGRATIONS.length });
+  });
+
+  it('la migración 2 crea las tablas de descargas sin tocar los datos existentes', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec(MIGRATIONS[0]!);
+    db.exec('PRAGMA user_version = 1');
+    db.prepare("INSERT INTO roots (path, status, created_at) VALUES ('D:\\Music', 'online', 0)").run();
+    migrate(db);
+    expect({ ...db.prepare('PRAGMA user_version').get() }).toEqual({ user_version: 2 });
+    for (const t of ['yt_sources', 'yt_jobs', 'yt_items']) {
+      expect(db.prepare('SELECT name FROM sqlite_master WHERE name = ?').get(t)).toBeTruthy();
+    }
+    expect(db.prepare('SELECT path FROM roots').all()).toEqual([{ path: 'D:\\Music' }]);
   });
 
   it('serverId persiste', () => {

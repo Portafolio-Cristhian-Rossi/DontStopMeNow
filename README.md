@@ -53,12 +53,20 @@ Sin Docker, también está el binario de Linux (`DontStopMeNow-linux-x64.zip` en
 
 En **http://localhost:4747**, desde la misma compu:
 
-1. **Ajustes:** agregá tu carpeta de música (por ejemplo `D:\Música`). El servidor la escanea y después
-   vigila los cambios.
+1. **Ajustes:** agregá tu carpeta de música (por ejemplo `D:\Música`) con "Examinar…" o pegando la ruta. El
+   servidor la escanea y después vigila los cambios.
 2. **Biblioteca:** álbumes, artistas y canciones armados desde la metadata.
 3. **Listas:** listas manuales (agregás canciones desde la biblioteca) o de carpeta (todo lo que haya en
    una carpeta, se actualiza sola).
-4. **Dispositivos:** el código QR para vincular el celular.
+4. **Descargar:** bajá música de YouTube con [yt-dlp](https://github.com/yt-dlp/yt-dlp) y
+   [ffmpeg](https://ffmpeg.org/) (instalalos aparte). Una vez:
+   en **Ajustes → Descargas con yt-dlp** indicá dónde está `yt-dlp.exe` (si está en tu carpeta de música, ya
+   aparece sugerido). Después, en **Descargar**: pegá el link de una playlist o un video, revisá la lista (las
+   repetidas, las que ya tenés y los videos no disponibles vienen desmarcados; las versiones distintas se
+   agrupan), elegí la carpeta y agregalo a la cola. Baja de a una canción en MP3 con metadata y portada, en
+   `Carpeta\Playlist\NN - Título.mp3`, y crea una lista de carpeta con el nombre de la playlist. En "Tus
+   playlists de YouTube", **Buscar nuevas** trae solo lo que se agregó después.
+5. **Dispositivos:** el código QR para vincular el celular.
 
 ### La app del celular
 
