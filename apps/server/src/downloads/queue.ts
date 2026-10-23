@@ -48,7 +48,20 @@ export interface DownloadQueue {
   idle(): Promise<void>;
 }
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Pausa que se corta antes si se aborta `signal` (apagar el servidor no espera los 5 s). */
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 const videoUrl = (videoId: string) => `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
 
 export function createDownloadQueue(o: {
@@ -58,14 +71,28 @@ export function createDownloadQueue(o: {
   ytdlp: () => YtDlp | null;
   ffmpeg: () => boolean;
   tempRoot: string;
-  wait?: (ms: number) => Promise<void>;
+  wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
   log?: (err: unknown, msg: string) => void;
+  /** Borra una carpeta temporal; en los tests se reemplaza para simular el EBUSY de Windows. */
+  removeDir?: (dir: string) => void;
 }): DownloadQueue {
   const { db, bus } = o;
   const wait = o.wait ?? sleep;
   const log = o.log ?? (() => {});
+  const removeDir = o.removeDir ?? ((dir) => rmSync(dir, { recursive: true, force: true, maxRetries: 3 }));
+
+  /** Si Windows todavía tiene un archivo abierto, se deja: el próximo arranque limpia yt-tmp entero. */
+  function removeTemp(dir: string) {
+    try {
+      removeDir(dir);
+    } catch (err) {
+      log(err, 'No se pudieron borrar los temporales de la descarga');
+    }
+  }
 
   let started = false;
+  /** Se aborta en stop(): corta la pausa entre canciones. */
+  let stopping = new AbortController();
   let loop: Promise<void> | null = null;
   let current: { jobId: number; videoId: string; controller: AbortController } | null = null;
   const lastProgress = new Map<number, number>();
@@ -142,11 +169,15 @@ export function createDownloadQueue(o: {
 
     for (const item of job.items) {
       if (item.status !== 'pending') continue;
-      // Lo que pudo cambiar mientras bajaba la anterior: cancelado, raíz quitada o desconectada.
-      if (getJob(db, job.id)?.status !== 'running') return;
+      // Lo que pudo cambiar mientras bajaba la anterior: apagado, cancelado, raíz quitada o desconectada.
+      if (!started || getJob(db, job.id)?.status !== 'running') return;
       if (rootStatus(job.rootId) === 'offline') return pause(job.id, OFFLINE_REASON);
-      mkdirSync(dest.abs, { recursive: true });
-      mkdirSync(tempDir, { recursive: true });
+      try {
+        mkdirSync(dest.abs, { recursive: true });
+        mkdirSync(tempDir, { recursive: true });
+      } catch (err) {
+        return pause(job.id, `No se pudo preparar la carpeta de destino: ${errorMessage(err)}`);
+      }
 
       setItem(db, job.id, item.videoId, { status: 'downloading', error: null });
       emit(job.id, { videoId: item.videoId, title: item.title, progress: { stage: 'download', percent: 0 } });
@@ -168,11 +199,15 @@ export function createDownloadQueue(o: {
         limitStreak = 0;
         setItem(db, job.id, item.videoId, { status: 'done', filePath });
         emit(job.id);
-        await wait(PAUSE_MS);
+        await wait(PAUSE_MS, stopping.signal);
       } catch (err) {
         // Cancelar ya dejó la base como corresponde; apagar deja la canción "downloading" para retomarla.
-        if (controller.signal.aborted) return;
-        const message = err instanceof Error ? err.message : String(err);
+        if (controller.signal.aborted) {
+          // yt-dlp ya cerró: recién ahora Windows deja borrar sus archivos a medio bajar.
+          if (getJob(db, job.id)?.status === 'cancelled') removeTemp(tempDir);
+          return;
+        }
+        const message = errorMessage(err);
         limitStreak = RATE_LIMITED.test(message) ? limitStreak + 1 : 0;
         if (limitStreak >= LIMIT_STREAK) {
           setItem(db, job.id, item.videoId, { status: 'pending', error: null });
@@ -188,7 +223,7 @@ export function createDownloadQueue(o: {
     if (!started || getJob(db, job.id)?.status !== 'running') return;
     await finish(job);
     setJobStatus(db, job.id, 'done');
-    rmSync(tempDir, { recursive: true, force: true });
+    removeTemp(tempDir);
     lastProgress.delete(job.id);
     emit(job.id);
   }
@@ -207,7 +242,13 @@ export function createDownloadQueue(o: {
 
   async function run() {
     for (let job = nextRunnableJob(db); job && started; job = nextRunnableJob(db)) {
-      await runJob(job);
+      try {
+        await runJob(job);
+      } catch (err) {
+        // Algo inesperado: mejor pausado con el motivo que trabado en "Bajando".
+        log(err, 'Falló una descarga');
+        if (getJob(db, job.id)?.status === 'running') pause(job.id, `Error inesperado: ${errorMessage(err)}`);
+      }
     }
   }
 
@@ -273,13 +314,15 @@ export function createDownloadQueue(o: {
 
     start() {
       resetInterrupted(db);
-      rmSync(o.tempRoot, { recursive: true, force: true });
+      removeTemp(o.tempRoot);
+      stopping = new AbortController();
       started = true;
       kick();
     },
 
     async stop() {
       started = false;
+      stopping.abort();
       current?.controller.abort();
       await loop;
     },
@@ -295,8 +338,9 @@ export function createDownloadQueue(o: {
         }
       }
       setJobStatus(db, jobId, 'cancelled');
+      // Si está bajando, los temporales se borran cuando yt-dlp termina de cerrar (ver runJob).
       if (current?.jobId === jobId) current.controller.abort();
-      rmSync(tempDirOf(jobId), { recursive: true, force: true });
+      else removeTemp(tempDirOf(jobId));
       emit(jobId);
     },
 

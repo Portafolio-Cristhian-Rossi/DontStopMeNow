@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { DownloadEvent, EnqueueRequest } from '@dsmn/shared';
@@ -18,7 +18,7 @@ let root: string;
 let rootId: number;
 let tempRoot: string;
 let q: DownloadQueue;
-const wait = vi.fn<(ms: number) => Promise<void>>(async () => {});
+const wait = vi.fn<(ms: number, signal?: AbortSignal) => Promise<void>>(async () => {});
 const scanScopes = vi.fn(async () => ({ added: 0, updated: 0, removed: 0, moved: 0, issues: 0 }));
 
 const item = (videoId: string, position: number | null) => ({
@@ -76,7 +76,7 @@ describe('cola de descargas', () => {
     const job = q.enqueue(req({ items: [item('ok2', 2), item('ok1', 1)] }));
     await q.idle();
     expect(downloadedIds(fake)).toEqual(['ok1', 'ok2']);
-    expect(wait.mock.calls).toEqual([[5000], [5000]]);
+    expect(wait.mock.calls.map(([ms]) => ms)).toEqual([5000, 5000]);
     expect(getJob(db, job.id)).toMatchObject({
       status: 'done',
       finishedAt: expect.any(Number),
@@ -110,7 +110,7 @@ describe('cola de descargas', () => {
         { videoId: 'ok1', status: 'done' },
       ],
     });
-    expect(wait.mock.calls).toEqual([[5000]]);
+    expect(wait.mock.calls.map(([ms]) => ms)).toEqual([5000]);
   });
 
   it('si todas fallan no escanea ni crea la lista', async () => {
@@ -191,6 +191,24 @@ describe('cola de descargas', () => {
     expect(q.busy()).toBe(false);
   });
 
+  it('cancelar no falla si Windows todavía no deja borrar los temporales, y los borra al cerrar yt-dlp', async () => {
+    await q.stop();
+    const busy = Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+    const removeDir = vi.fn<(dir: string) => void>(() => {
+      throw busy;
+    });
+    const log = vi.fn();
+    q = makeQueue({ removeDir, log });
+    q.start();
+    const job = q.enqueue(req({ items: [item('hang1', 1)] }));
+    await vi.waitFor(() => expect(downloadedIds(fake)).toEqual(['hang1']));
+    expect(() => q.cancel(job.id)).not.toThrow();
+    await q.idle();
+    expect(getJob(db, job.id)!.status).toBe('cancelled');
+    expect(removeDir).toHaveBeenCalledWith(join(tempRoot, String(job.id)));
+    expect(log).toHaveBeenCalledWith(busy, expect.any(String));
+  });
+
   it('cancelar un trabajo en espera no lo baja; uno terminado → 409; inexistente → 404', async () => {
     await q.stop();
     const job = q.enqueue(req());
@@ -216,6 +234,23 @@ describe('cola de descargas', () => {
       pauseReason: 'YouTube está limitando las descargas: esperá un rato o actualizá yt-dlp',
     });
     expect(getJob(db, a.id)!.items.map((i) => i.status)).toEqual(['failed', 'failed', 'pending', 'pending']);
+    expect(getJob(db, b.id)!.status).toBe('done');
+  });
+
+  it('si no se puede crear la carpeta, pausa con el motivo y sigue con el próximo', async () => {
+    await q.stop();
+    writeFileSync(join(root, 'Fake Playlist'), 'un archivo donde iría la carpeta');
+    const a = q.enqueue(req());
+    const b = q.enqueue(
+      req({ kind: 'video', ytPlaylistId: null, folder: '', playlistSize: 1, items: [item('ok9', null)] }),
+    );
+    q.start();
+    await q.idle();
+    expect(getJob(db, a.id)).toMatchObject({
+      status: 'paused',
+      pauseReason: expect.stringContaining('No se pudo preparar la carpeta de destino'),
+      items: [{ status: 'pending' }],
+    });
     expect(getJob(db, b.id)!.status).toBe('done');
   });
 
@@ -271,6 +306,29 @@ describe('cola de descargas', () => {
       items: [{ status: 'downloading', error: null }, { status: 'pending' }],
     });
     expect(downloadedIds(fake)).toEqual(['hang1']);
+  });
+
+  it('stop durante la pausa entre canciones corta el trabajo sin bajar las siguientes', async () => {
+    await q.stop();
+    let pausing: () => void = () => {};
+    const paused = new Promise<void>((resolve) => (pausing = resolve));
+    // Pausa real: no termina sola, solo la corta stop().
+    q = makeQueue({
+      wait: (_ms, signal) =>
+        new Promise<void>((resolve) => {
+          pausing();
+          signal?.addEventListener('abort', () => resolve(), { once: true });
+        }),
+    });
+    q.start();
+    const job = q.enqueue(req({ items: [item('ok1', 1), item('ok2', 2), item('ok3', 3)] }));
+    await paused;
+    await q.stop();
+    expect(downloadedIds(fake)).toEqual(['ok1']);
+    expect(getJob(db, job.id)).toMatchObject({
+      status: 'running',
+      items: [{ status: 'done' }, { status: 'pending' }, { status: 'pending' }],
+    });
   });
 
   it('al arrancar retoma lo interrumpido y limpia los temporales', async () => {

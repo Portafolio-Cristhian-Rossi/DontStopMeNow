@@ -13,7 +13,8 @@ export interface ServerEvents {
 
 /**
  * Escucha /api/admin/events: progreso del escaneo y de las descargas, y refresco de datos cuando cambia la revisión o
- * el estado de una descarga (el progreso solo no refresca, para no pedir la cola varias veces por segundo).
+ * cuando una descarga cambia de estado o termina/falla una canción (el porcentaje solo no refresca, para no pedir la
+ * cola varias veces por segundo).
  */
 export function useServerEvents(): ServerEvents {
   const queryClient = useQueryClient();
@@ -22,7 +23,8 @@ export function useServerEvents(): ServerEvents {
 
   useEffect(() => {
     const source = new EventSource('/api/admin/events');
-    const lastStatus = new Map<number, DownloadEvent['status']>();
+    /** Estado y conteos de cada trabajo: cambian por canción, no con cada porcentaje. */
+    const lastSeen = new Map<number, string>();
     const invalidate = (keys: readonly (readonly string[])[]) => {
       for (const key of keys) void queryClient.invalidateQueries({ queryKey: key });
     };
@@ -31,8 +33,9 @@ export function useServerEvents(): ServerEvents {
     const onDownload = (e: MessageEvent) => {
       const event = JSON.parse(e.data) as DownloadEvent;
       setDownloads((prev) => ({ ...prev, [event.jobId]: event }));
-      if (lastStatus.get(event.jobId) !== event.status) {
-        lastStatus.set(event.jobId, event.status);
+      const seen = `${event.status}:${event.done}:${event.failed}`;
+      if (lastSeen.get(event.jobId) !== seen) {
+        lastSeen.set(event.jobId, seen);
         invalidate([queryKeys.downloadJobs, queryKeys.ytSources]);
       }
     };

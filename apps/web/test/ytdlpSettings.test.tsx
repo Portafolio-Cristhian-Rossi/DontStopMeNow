@@ -92,7 +92,7 @@ describe('ajustes de yt-dlp', () => {
 });
 
 describe('eventos de descargas', () => {
-  it('un cambio de estado refresca trabajos y playlists; el progreso solo, no', async () => {
+  it('refresca al cambiar el estado o al terminar/fallar una canción; el porcentaje solo, no', async () => {
     const { queryClient } = setup();
     await screen.findByRole('navigation');
     const keys = [['download-jobs'], ['yt-sources']];
@@ -100,25 +100,32 @@ describe('eventos de descargas', () => {
       for (const key of keys) queryClient.setQueryData(key, []);
     };
     const invalidated = () => keys.map((key) => queryClient.getQueryState(key)?.isInvalidated);
-    const event = (status: string, done: number) => ({
+    const event = (status: string, done: number, failed: number, percent: number | null) => ({
       jobId: 1,
       status,
       done,
-      failed: 0,
+      failed,
       total: 3,
-      current:
-        status === 'running' ? { videoId: 'a', title: 'A', stage: 'download', percent: done * 10 } : null,
+      current: status === 'running' ? { videoId: 'a', title: 'A', stage: 'download', percent } : null,
     });
 
     reset();
-    act(() => FakeEventSource.last.emit('download', event('running', 0)));
+    act(() => FakeEventSource.last.emit('download', event('running', 0, 0, 0)));
     await waitFor(() => expect(invalidated()).toEqual([true, true]));
 
     reset();
-    act(() => FakeEventSource.last.emit('download', event('running', 1)));
+    act(() => FakeEventSource.last.emit('download', event('running', 0, 0, 40)));
     expect(invalidated()).toEqual([false, false]);
 
-    act(() => FakeEventSource.last.emit('download', event('done', 3)));
+    act(() => FakeEventSource.last.emit('download', event('running', 1, 0, 0)));
+    await waitFor(() => expect(invalidated()).toEqual([true, true]));
+
+    reset();
+    act(() => FakeEventSource.last.emit('download', event('running', 1, 1, 0)));
+    await waitFor(() => expect(invalidated()).toEqual([true, true]));
+
+    reset();
+    act(() => FakeEventSource.last.emit('download', event('done', 2, 1, null)));
     await waitFor(() => expect(invalidated()).toEqual([true, true]));
   });
 });
