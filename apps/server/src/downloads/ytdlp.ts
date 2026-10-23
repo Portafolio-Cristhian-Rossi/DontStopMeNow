@@ -32,6 +32,11 @@ export interface YtDlp {
 export class YtDlpError extends Error {}
 
 const STALL_MS = 300_000;
+/**
+ * YouTube exige resolver desafíos de JavaScript; yt-dlp solo busca deno por defecto y sin runtime recibe 403. El
+ * servidor siempre corre sobre Node, así que se lo pasamos.
+ */
+const JS_RUNTIME = ['--js-runtimes', `node:${process.execPath}`];
 const CONVERT_LINE = /^\[(ExtractAudio|EmbedThumbnail|Metadata)\]/;
 
 interface RunOptions {
@@ -127,7 +132,7 @@ export function createYtDlp(o: { command: string; prefixArgs?: string[]; stallMs
     },
 
     async preview(url) {
-      const data = JSON.parse(await run([...PREVIEW_ARGS, '--', url])) as RawInfo;
+      const data = JSON.parse(await run([...JS_RUNTIME, ...PREVIEW_ARGS, '--', url])) as RawInfo;
       if (data._type === 'playlist') {
         return {
           kind: 'playlist',
@@ -148,7 +153,7 @@ export function createYtDlp(o: { command: string; prefixArgs?: string[]; stallMs
 
     async downloadOne(args, onProgress, signal) {
       let filePath: string | null = null;
-      await run(args, {
+      await run([...JS_RUNTIME, ...args], {
         signal,
         onLine: (line) => {
           if (line.startsWith('dsmn-progress ')) {

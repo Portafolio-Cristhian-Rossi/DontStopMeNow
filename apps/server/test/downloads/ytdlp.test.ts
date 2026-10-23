@@ -95,6 +95,19 @@ describe('adaptador de yt-dlp', () => {
     expect(lastCall().at(-2)).toBe('--');
   });
 
+  it('previsualizar y bajar usan el Node del servidor para resolver los desafíos JS de YouTube', async () => {
+    await yt.preview('https://www.youtube.com/watch?v=ok7');
+    await yt.downloadOne(argsFor('ok1'), () => {}, new AbortController().signal);
+    await yt.version();
+    const [preview, download, version] = calls()
+      .slice(-3)
+      .map((c) => c.args);
+    const runtime = ['--js-runtimes', `node:${process.execPath}`];
+    expect(preview!.slice(0, 2)).toEqual(runtime);
+    expect(download!.slice(0, 2)).toEqual(runtime);
+    expect(version).toEqual(['--version']);
+  });
+
   it('fuerza UTF-8 en la salida de yt-dlp (títulos y rutas con tildes)', async () => {
     await yt.version();
     expect(calls().at(-1)!.pythonIoEncoding).toBe('utf-8');
