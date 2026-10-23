@@ -2,6 +2,7 @@ import { formatDuration } from '@dsmn/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Cover } from '../../src/components/Cover.tsx';
+import { MiniPlayer } from '../../src/components/MiniPlayer.tsx';
 import { PlayButtons } from '../../src/components/PlayButtons.tsx';
 import { TrackRow } from '../../src/components/TrackRow.tsx';
 import { libraryView } from '../../src/core/library.ts';
@@ -20,9 +21,10 @@ export default function AlbumScreen() {
   const total = tracks.reduce((s, t) => s + t.durationMs, 0);
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <Stack.Screen options={{ title: album.title }} />
       <FlatList
+        style={{ flex: 1 }}
         data={tracks}
         keyExtractor={(t) => t.id}
         ListHeaderComponent={
@@ -52,7 +54,8 @@ export default function AlbumScreen() {
           />
         )}
       />
-    </>
+      <MiniPlayer />
+    </View>
   );
 }
 

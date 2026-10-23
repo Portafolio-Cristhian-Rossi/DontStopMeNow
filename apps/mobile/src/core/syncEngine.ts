@@ -261,17 +261,21 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
     for (const id of needed) {
       const dest = coverPath(files, id);
       if (files.exists(dest) || signal.aborted) continue;
+      // Como las canciones: se baja a .part y se mueve solo si terminó (una portada a medias no se repara sola).
+      const part = `${dest}.part`;
       try {
-        await downloader.download({
+        const result = await downloader.download({
           url: client.coverUrl(id),
           headers: client.authHeaders(),
-          dest,
+          dest: part,
           signal,
           onProgress: () => {},
         });
+        if (result.status === 'done') files.move(part, dest);
       } catch {
-        if (files.exists(dest)) files.remove(dest);
+        // Una portada que no baja no es una falla de la sincronización.
       }
+      if (files.exists(part)) files.remove(part);
     }
     for (const name of files.list(files.coversDir)) {
       if (!needed.has(name)) files.remove(`${files.coversDir}/${name}`);

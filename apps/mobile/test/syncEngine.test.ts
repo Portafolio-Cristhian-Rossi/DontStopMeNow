@@ -228,4 +228,20 @@ describe('runSync', () => {
     await s.run();
     expect(s.downloader.calls.some((c) => c.url.includes('/api/covers/'))).toBe(false);
   });
+
+  it('una portada interrumpida no queda a medias', async () => {
+    const s = setup();
+    s.catalog.tracks[0]!.coverId = 'c1';
+    const download = s.downloader.download.bind(s.downloader);
+    s.downloader.download = async (req) => {
+      if (req.url.includes('/api/covers/')) {
+        s.files.files.set(req.dest, new Uint8Array([1]));
+        return { status: 'paused', state: 'x' };
+      }
+      return download(req);
+    };
+    s.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    await s.run();
+    expect([...s.files.files.keys()].filter((k) => k.startsWith('/covers/'))).toEqual([]);
+  });
 });

@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { FlatList, Text, View } from 'react-native';
+import { MiniPlayer } from '../../src/components/MiniPlayer.tsx';
 import { PlayButtons } from '../../src/components/PlayButtons.tsx';
 import { TrackRow } from '../../src/components/TrackRow.tsx';
 import { libraryView } from '../../src/core/library.ts';
@@ -19,9 +20,10 @@ export default function PlaylistScreen() {
   const tracks = playlist.trackIds.flatMap((tid) => byId.get(tid) ?? []);
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <Stack.Screen options={{ title: playlist.name }} />
       <FlatList
+        style={{ flex: 1 }}
         data={tracks}
         keyExtractor={(t, i) => `${i}-${t.id}`}
         ListHeaderComponent={
@@ -42,6 +44,7 @@ export default function PlaylistScreen() {
           />
         )}
       />
-    </>
+      <MiniPlayer />
+    </View>
   );
 }

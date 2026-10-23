@@ -72,7 +72,18 @@ export interface PlayerEngine {
   add(source: { uri: string }): void;
   remove(index: number): void;
   setNowPlaying(meta: { title: string; artist: string; albumTitle: string; artworkUrl?: string }): void;
-  status(): { index: number; positionMs: number; durationMs: number; playing: boolean };
+  /** Quita los controles de la notificación y la pantalla de bloqueo. */
+  clearNowPlaying(): void;
+  status(): EngineStatus;
   onTrackChanged(cb: (index: number) => void): () => void;
-  onStatus(cb: () => void): () => void;
+  onStatus(cb: (status: EngineStatus) => void): () => void;
 }
+
+/** `ended`: terminó la última canción de la cola (sin repetir). */
+export type EngineStatus = {
+  index: number;
+  positionMs: number;
+  durationMs: number;
+  playing: boolean;
+  ended: boolean;
+};

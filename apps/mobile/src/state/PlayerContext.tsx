@@ -38,6 +38,12 @@ export function usePlayer(): PlayerController {
   return player;
 }
 
+/** Solo el id de la canción actual: las filas de la biblioteca no se re-renderizan con el progreso. */
+export function useCurrentTrackId(): string | null {
+  const player = usePlayer();
+  return useSyncExternalStore(player.subscribe, () => player.currentTrackId());
+}
+
 export function usePlayerSnapshot(): PlayerSnapshot {
   const player = usePlayer();
   return useSyncExternalStore(player.subscribe, player.getSnapshot);
@@ -67,7 +73,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void setAudioModeAsync({
       shouldPlayInBackground: true,
-      interruptionMode: 'doNotMix',
+      interruptionMode: 'doNotMixPersistent',
       playsInSilentMode: true,
     });
     player.restore();

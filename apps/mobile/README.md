@@ -62,6 +62,9 @@ Al terminar, EAS muestra un link y un código QR: abrilo desde el celular, desca
 - [ ] Desmarcar el álbum que está sonando y sincronizar: la canción actual sigue sonando y se borra en la
       próxima sincronización; las demás salen de la cola.
 - [ ] Modo avión: las portadas se siguen viendo.
+- [ ] En Canciones, con miles de canciones descargadas, tocar una: empieza a sonar sin trabar la app, y el
+      reproductor y la cola responden fluido.
+- [ ] Terminar un álbum (sin repetir) y tocar play: vuelve a empezar desde la primera.
 - [ ] La primera vez que reproducís, Android pide permiso de notificaciones: aceptalo para tener los
       controles.
 

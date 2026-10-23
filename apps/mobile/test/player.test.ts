@@ -10,13 +10,22 @@ type Call = [string, ...unknown[]];
 function fakeEngine() {
   const calls: Call[] = [];
   let trackCb: ((i: number) => void) | null = null;
-  const status = { index: 0, positionMs: 0, durationMs: 180_000, playing: false };
-  const engine: PlayerEngine & { calls: Call[]; status_: typeof status; emitTrack(i: number): void } = {
+  let statusCb: ((s: ReturnType<PlayerEngine['status']>) => void) | null = null;
+  const status = { index: 0, positionMs: 0, durationMs: 180_000, playing: false, ended: false };
+  const engine: PlayerEngine & {
+    calls: Call[];
+    status_: typeof status;
+    emitTrack(i: number): void;
+    emitStatus(): void;
+  } = {
     calls,
     status_: status,
     emitTrack(i) {
       status.index = i;
       trackCb?.(i);
+    },
+    emitStatus() {
+      statusCb?.({ ...status });
     },
     load: (sources, startIndex, positionMs, autoplay) => {
       calls.push(['load', sources.map((s) => s.uri), startIndex, positionMs, autoplay]);
@@ -39,12 +48,16 @@ function fakeEngine() {
     add: (source) => calls.push(['add', source.uri]),
     remove: (i) => calls.push(['remove', i]),
     setNowPlaying: (meta) => calls.push(['setNowPlaying', meta]),
+    clearNowPlaying: () => calls.push(['clearNowPlaying']),
     status: () => ({ ...status }),
     onTrackChanged: (cb) => {
       trackCb = cb;
       return () => (trackCb = null);
     },
-    onStatus: () => () => {},
+    onStatus: (cb) => {
+      statusCb = cb;
+      return () => (statusCb = null);
+    },
   };
   return engine;
 }
@@ -257,5 +270,77 @@ describe('PlayerController', () => {
     controller.next();
     expect(n).toBeGreaterThan(0);
     expect(controller.currentTrackId()).toBe('t1');
+  });
+
+  it('se corrige si el motor informa otro índice sin avisar el cambio de canción', async () => {
+    const { controller, engine, store } = setup();
+    controller.playList(['t1', 't2', 't3', 't4'], 1);
+    engine.status_.index = 3;
+    engine.emitStatus();
+    await Promise.resolve();
+    expect(controller.getSnapshot().current?.id).toBe('t4');
+    expect(store.getPlayerState()?.queue.index).toBe(3);
+    expect((lastCall(engine, 'setNowPlaying')![1] as { title: string }).title).toBe('Tema t4');
+    controller.next();
+    expect(lastCall(engine, 'skipTo')).toBeUndefined();
+  });
+
+  it('guarda la posición cuando se pausa desde afuera (notificación, auriculares)', async () => {
+    const { controller, engine, store } = setup();
+    controller.playList(['t1', 't2'], 0);
+    engine.status_.positionMs = 61_000;
+    engine.status_.playing = false;
+    engine.emitStatus();
+    await Promise.resolve();
+    expect(store.getPlayerState()?.positionMs).toBe(61_000);
+    expect(controller.getSnapshot().playing).toBe(false);
+  });
+
+  it('play después de que terminó la última canción vuelve a empezar la cola', () => {
+    const { controller, engine } = setup();
+    controller.playList(['t1', 't2'], 1);
+    engine.status_.playing = false;
+    engine.status_.ended = true;
+    controller.toggle();
+    expect(engine.calls.slice(-2)).toEqual([['skipTo', 0], ['play']]);
+  });
+
+  it('restaurar no muestra la notificación hasta que se reproduce', () => {
+    const { controller, engine, store } = setup();
+    store.setPlayerState({
+      queue: {
+        order: ['t1', 't2'],
+        original: ['t1', 't2'],
+        index: 0,
+        shuffle: false,
+        repeat: 'off',
+        nextCount: 0,
+      },
+      positionMs: 0,
+    });
+    controller.restore();
+    expect(lastCall(engine, 'setNowPlaying')).toBeUndefined();
+    controller.toggle();
+    expect(lastCall(engine, 'setNowPlaying')).toBeDefined();
+  });
+
+  it('si la cola queda vacía se quitan los controles de la notificación', () => {
+    const { controller, engine, present } = setup();
+    controller.playList(['t1'], 0);
+    present.clear();
+    controller.pruneMissing();
+    expect(lastCall(engine, 'clearNowPlaying')).toEqual(['clearNowPlaying']);
+    expect(controller.getSnapshot().current).toBeNull();
+  });
+
+  it('agrupa los avisos a suscriptores de muchos eventos seguidos', async () => {
+    const { controller, engine } = setup();
+    controller.playList(['t1', 't2'], 0);
+    await Promise.resolve();
+    let n = 0;
+    controller.subscribe(() => n++);
+    for (let i = 0; i < 50; i++) engine.emitStatus();
+    await Promise.resolve();
+    expect(n).toBe(1);
   });
 });

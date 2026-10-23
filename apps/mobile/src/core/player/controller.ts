@@ -1,7 +1,7 @@
 import type { Album, Catalog, Track } from '@dsmn/shared';
 import type { LocalStore } from '../store.ts';
 import { coverPath } from '../syncEngine.ts';
-import type { EngineLoop, FileStore, PlayerEngine } from '../types.ts';
+import type { EngineLoop, EngineStatus, FileStore, PlayerEngine } from '../types.ts';
 import {
   addToQueue,
   createQueue,
@@ -51,6 +51,10 @@ export class PlayerController {
     durationMs: 0,
   };
   private readonly listeners = new Set<() => void>();
+  /** Los controles de la notificación se activan recién cuando se reproduce algo. */
+  private nowPlayingActive = false;
+  private refreshQueued = false;
+  private latestStatus: EngineStatus | null = null;
   private lookup: { catalog: Catalog | null; tracks: Map<string, Track>; albums: Map<string, Album> } = {
     catalog: null,
     tracks: new Map(),
@@ -65,7 +69,30 @@ export class PlayerController {
       this.persist();
       this.refresh();
     });
-    deps.engine.onStatus(() => this.refresh());
+    deps.engine.onStatus((status) => this.onEngineStatus(status));
+  }
+
+  /**
+   * El motor manda su estado varias veces por segundo. El índice del motor manda: si cambió sin
+   * aviso de cambio de canción (pasa al quitar canciones antes de la actual), la cola se corrige.
+   * Una pausa desde afuera (notificación, auriculares) también se guarda.
+   */
+  private onEngineStatus(status: EngineStatus): void {
+    const q = this.queue;
+    if (q && status.index >= 0 && status.index < q.order.length && status.index !== q.index) {
+      this.queue = moveTo(q, status.index);
+      this.updateNowPlaying();
+      this.persist(status.positionMs);
+    } else if (this.snapshot.playing && !status.playing) {
+      this.persist(status.positionMs);
+    }
+    this.latestStatus = status;
+    if (this.refreshQueued) return;
+    this.refreshQueued = true;
+    queueMicrotask(() => {
+      this.refreshQueued = false;
+      this.refresh(this.latestStatus ?? undefined);
+    });
   }
 
   subscribe = (cb: () => void): (() => void) => {
@@ -87,16 +114,24 @@ export class PlayerController {
     const shuffle = opts.shuffle ?? this.queue?.shuffle ?? false;
     const repeat = this.queue?.repeat ?? 'off';
     this.queue = createQueue(kept, start, { shuffle, repeat }, this.deps.random);
+    this.nowPlayingActive = true;
     this.loadEngine(0, true);
   }
 
   toggle(): void {
     if (!this.queue) return;
-    if (this.deps.engine.status().playing) {
+    const status = this.deps.engine.status();
+    if (status.playing) {
       this.deps.engine.pause();
       this.persist();
     } else {
+      // Al terminar la última canción el motor queda "terminado": play no haría nada.
+      if (status.ended) this.deps.engine.skipTo(0);
       this.deps.engine.play();
+      if (!this.nowPlayingActive) {
+        this.nowPlayingActive = true;
+        this.updateNowPlaying();
+      }
     }
     this.refresh();
   }
@@ -185,6 +220,8 @@ export class PlayerController {
     if (next.index < 0) {
       this.queue = null;
       this.deps.engine.load([], 0, 0, false);
+      this.deps.engine.clearNowPlaying();
+      this.nowPlayingActive = false;
       this.deps.store.setPlayerState(null);
     } else if (playingId !== null && exists(playingId)) {
       for (let i = q.order.length - 1; i >= 0; i--) if (!exists(q.order[i]!)) this.deps.engine.remove(i);
@@ -225,6 +262,7 @@ export class PlayerController {
   }
 
   private updateNowPlaying(): void {
+    if (!this.nowPlayingActive) return;
     const id = this.currentTrackId();
     const { tracks, albums } = this.maps();
     const track = id ? tracks.get(id) : undefined;
@@ -238,13 +276,12 @@ export class PlayerController {
     });
   }
 
-  private persist(): void {
+  private persist(positionMs = this.deps.engine.status().positionMs): void {
     if (!this.queue) return;
-    this.deps.store.setPlayerState({ queue: this.queue, positionMs: this.deps.engine.status().positionMs });
+    this.deps.store.setPlayerState({ queue: this.queue, positionMs });
   }
 
-  private refresh(): void {
-    const status = this.deps.engine.status();
+  private refresh(status: EngineStatus = this.deps.engine.status()): void {
     const id = this.currentTrackId();
     this.snapshot = {
       queue: this.queue,

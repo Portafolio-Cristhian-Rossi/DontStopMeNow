@@ -1,6 +1,6 @@
 import { formatDuration, type Track } from '@dsmn/shared';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { usePlayer, usePlayerSnapshot } from '../state/PlayerContext.tsx';
+import { useCurrentTrackId, usePlayer } from '../state/PlayerContext.tsx';
 
 interface Props {
   track: Track;
@@ -12,8 +12,7 @@ interface Props {
 /** Fila de canción. Mantener apretado ofrece "a continuación" y "agregar a la cola". */
 export function TrackRow({ track, index, onPress }: Props) {
   const player = usePlayer();
-  const { current } = usePlayerSnapshot();
-  const active = current?.id === track.id;
+  const active = useCurrentTrackId() === track.id;
 
   function showActions() {
     Alert.alert(track.title, track.artist, [
@@ -24,7 +23,12 @@ export function TrackRow({ track, index, onPress }: Props) {
   }
 
   return (
-    <Pressable style={styles.row} onPress={onPress} onLongPress={showActions}>
+    <Pressable
+      style={styles.row}
+      onPress={onPress}
+      onLongPress={showActions}
+      accessibilityHint="Mantené apretado para más opciones"
+    >
       {index !== undefined && <Text style={styles.index}>{index + 1}</Text>}
       <View style={{ flex: 1 }}>
         <Text style={[styles.title, active && styles.active]} numberOfLines={1}>
