@@ -1,7 +1,8 @@
 import { readdirSync, statSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type { BrowseResponse, Root } from '@dsmn/shared';
+import type { BrowseResponse, FsBrowseResponse, FsFolder, Root } from '@dsmn/shared';
 import type { EventBus } from '../events.ts';
 import { HttpError } from '../http/errors.ts';
 import { refreshAlbums } from '../scan/reconcile.ts';
@@ -14,6 +15,19 @@ function isDirectory(p: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Ocultas o del sistema: `.git`, `$RECYCLE.BIN`, `System Volume Information`. */
+function isHiddenFolder(name: string): boolean {
+  return name.startsWith('.') || name.startsWith('$') || name === 'System Volume Information';
+}
+
+/** Nombres de las subcarpetas visibles de `abs`, en orden alfabético natural. */
+function subfolders(abs: string): string[] {
+  return readdirSync(abs, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !isHiddenFolder(e.name))
+    .map((e) => e.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
 }
 
 /** ¿`inner` es `outer` o está dentro de ella? */
@@ -61,9 +75,56 @@ export function browse(db: DatabaseSync, rootId: number, relPath: string): Brows
   if (!resolved) throw new HttpError(400, 'bad_request', 'La carpeta debe estar dentro de la raíz');
   if (!isDirectory(resolved.abs))
     throw new HttpError(400, 'bad_request', `La carpeta no existe: ${resolved.rel}`);
-  const folders = readdirSync(resolved.abs, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
-    .map((e) => e.name)
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
-  return { rootId, path: resolved.rel, folders };
+  return { rootId, path: resolved.rel, folders: subfolders(resolved.abs) };
+}
+
+/** Accesos rápidos para elegir una raíz nueva: carpetas del usuario que existan y las unidades. */
+export function listPlaces(home = os.homedir()): FsFolder[] {
+  const places: FsFolder[] = [];
+  const candidates: [string, string[]][] = [
+    ['Música', ['Music', 'Música']],
+    ['Escritorio', ['Desktop', 'Escritorio']],
+    ['Descargas', ['Downloads', 'Descargas']],
+    ['Documentos', ['Documents', 'Documentos']],
+  ];
+  for (const [name, dirs] of candidates) {
+    const found = dirs.map((d) => path.join(home, d)).find(isDirectory);
+    if (found) places.push({ name, path: found });
+  }
+  if (isDirectory(home)) places.push({ name: 'Carpeta personal', path: home });
+  if (process.platform === 'win32') {
+    for (const letter of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+      const drive = `${letter}:\\`;
+      if (isDirectory(drive)) places.push({ name: `${letter}:`, path: drive });
+    }
+  } else {
+    places.push({ name: '/', path: '/' });
+    for (const dir of ['/media', '/mnt', '/Volumes']) {
+      if (isDirectory(dir)) places.push({ name: dir, path: dir });
+    }
+  }
+  return places;
+}
+
+/** Explorador de todo el disco, para elegir una raíz nueva (solo gestión local). */
+export function listFolders(input: string): FsBrowseResponse {
+  // "D:" a secas es relativa al directorio actual de esa unidad: la tomamos como su raíz.
+  const raw = /^[a-zA-Z]:$/.test(input) && path.sep === '\\' ? input + path.sep : input;
+  if (!path.isAbsolute(raw)) throw new HttpError(400, 'bad_request', 'La ruta debe ser absoluta');
+  const abs = path.resolve(raw);
+  let names: string[];
+  try {
+    names = subfolders(abs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ENOTDIR')
+      throw new HttpError(400, 'bad_request', `La carpeta no existe: ${abs}`);
+    throw new HttpError(403, 'forbidden', `No hay permiso para abrir ${abs}`);
+  }
+  const parent = path.dirname(abs);
+  return {
+    path: abs,
+    parent: parent === abs ? null : parent,
+    folders: names.map((name) => ({ name, path: path.join(abs, name) })),
+  };
 }

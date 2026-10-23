@@ -4,6 +4,8 @@ import type {
   CreatePlaylistRequest,
   Device,
   ErrorCode,
+  FsBrowseResponse,
+  FsFolder,
   PairingCodeResponse,
   Playlist,
   Root,
@@ -51,6 +53,9 @@ export const api = {
       'GET',
       `/api/admin/browse?${new URLSearchParams({ rootId: String(rootId), path }).toString()}`,
     ),
+  fsPlaces: () => request<FsFolder[]>('GET', '/api/admin/fs/places'),
+  fsBrowse: (path: string) =>
+    request<FsBrowseResponse>('GET', `/api/admin/fs?${new URLSearchParams({ path }).toString()}`),
   scan: () => request<void>('POST', '/api/admin/scan').then(() => undefined),
   issues: () => request<ScanIssue[]>('GET', '/api/admin/issues'),
   createPlaylist: (req: CreatePlaylistRequest) => request<Playlist>('POST', '/api/admin/playlists', req),

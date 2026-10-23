@@ -128,6 +128,17 @@ export const BrowseResponseSchema = z.object({
 });
 export type BrowseResponse = z.infer<typeof BrowseResponseSchema>;
 
+/** Carpeta del sistema (fuera de las raíces): nombre visible y ruta absoluta. */
+export const FsFolderSchema = z.object({ name: z.string(), path: z.string() });
+export type FsFolder = z.infer<typeof FsFolderSchema>;
+
+export const FsBrowseResponseSchema = z.object({
+  path: z.string(),
+  parent: z.string().nullable(),
+  folders: z.array(FsFolderSchema),
+});
+export type FsBrowseResponse = z.infer<typeof FsBrowseResponseSchema>;
+
 export const DeviceSchema = z.object({
   id: z.string(),
   name: z.string(),
