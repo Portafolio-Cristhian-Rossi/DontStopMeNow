@@ -23,4 +23,9 @@ describe('loadConfig', () => {
     expect(loadConfig({ DSMN_WEB_DIR: '/w' }, 'linux', '/h', () => true).webDir).toBe('/w');
     expect(loadConfig({}, 'linux', '/h', () => true).webDir).toMatch(/web[\\/]dist$/);
   });
+
+  it('usa el directorio web por defecto que recibe', () => {
+    expect(loadConfig({}, 'linux', '/h', () => true, '/opt/dsmn/web').webDir).toBe('/opt/dsmn/web');
+    expect(loadConfig({ DSMN_WEB_DIR: '/w' }, 'linux', '/h', () => true, '/opt/dsmn/web').webDir).toBe('/w');
+  });
 });

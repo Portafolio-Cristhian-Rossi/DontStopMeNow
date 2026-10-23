@@ -22,7 +22,10 @@ export interface AppDeps {
   onRootsChanged?: () => void;
 }
 
-export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): FastifyInstance {
+export function buildApp(
+  deps: AppDeps,
+  opts: { logger?: boolean | { level: string } } = {},
+): FastifyInstance {
   const app = Fastify({
     logger: opts.logger ?? false,
     trustProxy: false,
