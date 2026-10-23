@@ -40,9 +40,85 @@ describe('parseSongTitle', () => {
     expect(parseSongTitle('Song (Sped Up) [Remix]', null).tags).toEqual(['remix', 'sped up']);
   });
 
-  it('las etiquetas solo cuentan entre paréntesis o corchetes', () => {
+  it('el nombre de la canción no se toma como etiqueta: "Live Forever" no es una versión en vivo', () => {
     expect(parseSongTitle('Oasis - Live Forever', null)).toMatchObject({ base: 'live forever', tags: [] });
-    expect(parseSongTitle('Cover Me (Part 2)', null)).toMatchObject({ base: 'cover me part 2', tags: [] });
+  });
+
+  it('lo que no es ruido entre paréntesis, entre -guiones- o en un segmento extra es una variante', () => {
+    expect(parseSongTitle('Cover Me (Part 2)', null)).toMatchObject({ base: 'cover me', tags: ['part 2'] });
+    expect(parseSongTitle('Joy (P3R ver.)', null)).toMatchObject({ base: 'joy', tags: ['p3r ver'] });
+    expect(parseSongTitle("When The Moon's Reaching Out Stars -Reload-", null)).toMatchObject({
+      base: 'when the moon s reaching out stars',
+      tags: ['reload'],
+    });
+    expect(
+      parseSongTitle('Persona 5 OST - Life Will Change - Instrumental ver  Extended', null),
+    ).toMatchObject({
+      base: 'life will change',
+      tags: ['extended', 'instrumental'],
+    });
+  });
+
+  it('ignora el ruido habitual de YouTube', () => {
+    expect(
+      parseSongTitle('Persona 5 - Wake up, Get up, Get out there - sub español & sub english', null),
+    ).toMatchObject({
+      base: 'wake up get up get out there',
+      tags: [],
+    });
+    expect(parseSongTitle('Persona 5 - Life Will Change (中英歌詞)', null)).toMatchObject({
+      base: 'life will change',
+      tags: [],
+    });
+    expect(parseSongTitle('Pursuing My True Self (FULL w/ lyrics)', null)).toMatchObject({
+      base: 'pursuing my true self',
+      tags: [],
+    });
+    expect(parseSongTitle('Persona 4 Golden - Time to Make History REAL Lyrics', null)).toMatchObject({
+      base: 'time to make history real',
+    });
+  });
+});
+
+describe('versiones en una playlist real', () => {
+  it('agrupa las versiones de la misma canción sin desmarcar ninguna', () => {
+    const titles = [
+      "Persona 3 OST - When The Moon's Reaching Out Stars",
+      'Persona 3 OST - Joy',
+      'Persona 3 The Movie: #1 - Burn My Dread -Spring of Birth ver.-',
+      'Persona 5 - Life Will Change (中英歌詞)',
+      'Persona 5 OST - Life Will Change - Instrumental ver  Extended',
+      "When The Moon's Reaching Out Stars -Reload-",
+      'Joy (P3R ver.)',
+      'Burn My Dread -Reload-',
+      'Persona 3 OST - Mass Destruction',
+    ];
+    const r = analyzeEntries(
+      titles.map((t, i) => e(`v${i}`, t, null)),
+      [],
+    );
+    const group = (i: number) => r[i]!.versionGroup;
+    expect(group(0)).not.toBeNull();
+    expect(group(5)).toBe(group(0));
+    expect(group(6)).toBe(group(1));
+    expect(group(7)).toBe(group(2));
+    expect(group(4)).toBe(group(3));
+    expect(group(8)).toBeNull();
+    expect(r.every((x) => x.selected && x.duplicateOf === null)).toBe(true);
+  });
+
+  it('dos canciones distintas del mismo juego no se agrupan ni se marcan repetidas', () => {
+    const r = analyzeEntries(
+      [
+        e('a', 'Take Over (Battle Theme) - Persona 5 Royal', null),
+        e('b', 'Colors Flying High Full (Cleanest-outdated) - Persona 5 Royal OST', null),
+      ],
+      [],
+    );
+    expect(r.map((x) => [x.duplicateOf, x.versionGroup, x.selected])).toEqual([
+      [null, null, true],
+      [null, null, true],
+    ]);
   });
 });
 

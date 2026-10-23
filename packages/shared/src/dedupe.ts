@@ -27,9 +27,16 @@ const VERSION_TAGS: [string, RegExp][] = [
   ['unplugged', /\bunplugged\b/],
 ];
 
-/** Ruido de YouTube que no cambia la canción, de más largo a más corto. */
-const NOISE =
-  /\b(official music video|official video|official audio|music video|lyric video|video oficial|visualizer|remastered|remaster|lyrics|letra|audio|hd|4k)\b/g;
+/** Ruido de YouTube que se quita en cualquier parte, incluido el nombre ("Time to Make History REAL Lyrics"). */
+const NOISE_ANYWHERE =
+  /\b(official music video|official video|official audio|music video|lyric video|video oficial|with lyrics|w lyrics|lyrics)\b/g;
+
+/**
+ * Ruido que solo se quita entre paréntesis, entre -guiones- o en un segmento extra: "Full Moon Full Life" es un nombre,
+ * "(FULL w/ lyrics)" no.
+ */
+const NOISE_IN_GROUPS =
+  /\b(official music video|official video|official audio|music video|lyric video|video oficial|visualizer|remastered|remaster|with lyrics|w lyrics|lyrics|letra|audio|hd|4k|full|eng sub|english sub|sub espanol|sub english|english and spanish subtitles|subtitles|subtitulado|original soundtrack|soundtrack|ost)\b/g;
 
 const FEAT = /(^|\s)(ft|feat|featuring)\.?(\s.*)?$/;
 
@@ -53,14 +60,19 @@ function artistFromChannel(channel: string | null): string | null {
   return name ? fold(name) : null;
 }
 
+const collapse = (s: string) => s.replace(/\s+/g, ' ').trim();
+
 export function parseSongTitle(title: string, channel: string | null): ParsedSong {
   const split = /^(.+?)\s+[-–—]\s+(.+)$/.exec(title);
   const artist = split ? fold(split[1]!) || null : artistFromChannel(channel);
-  let song = split ? split[2]! : title;
+  const [name = '', ...extraSegments] = (split ? split[2]! : title).split(/\s+[-–—]\s+/);
 
   const tags = new Set<string>();
-  // Solo se miran etiquetas entre paréntesis o corchetes: "Live Forever" no es una versión en vivo.
-  song = song.replace(/[([]([^)\]]*)[)\]]/g, (_group, inner: string) => {
+  /**
+   * Un agregado al nombre — "(Live)", "-Reload-", "- Instrumental ver" — es una etiqueta de versión conocida, ruido o,
+   * si no es ninguna de las dos, una variante con su propio texto ("p3r ver", "part 2").
+   */
+  const addVariant = (inner: string) => {
     const text = fold(inner);
     let isVersion = false;
     for (const [tag, re] of VERSION_TAGS) {
@@ -69,12 +81,24 @@ export function parseSongTitle(title: string, channel: string | null): ParsedSon
         isVersion = true;
       }
     }
-    if (isVersion) return ' ';
-    const rest = text.replace(NOISE, ' ').replace(FEAT, ' ').trim();
-    return rest ? ` ${inner} ` : ' ';
-  });
+    if (isVersion || !/[a-z0-9]/.test(text)) return; // notas solo en otro alfabeto (中英歌詞) son ruido
+    const rest = collapse(text.replace(NOISE_IN_GROUPS, ' ').replace(FEAT, ' '));
+    if (rest) tags.add(rest);
+  };
 
-  const base = fold(song).replace(FEAT, ' ').trim().replace(/\s+/g, ' ');
+  extraSegments.forEach(addVariant);
+  // Solo los agregados cuentan como etiqueta: "Live Forever" no es una versión en vivo.
+  const song = name
+    .replace(/[([【]([^)\]】]*)[)\]】]/g, (_group, inner: string) => {
+      addVariant(inner);
+      return ' ';
+    })
+    .replace(/(^|\s)-([^-]+?)-(?=\s|$)/g, (_group, before: string, inner: string) => {
+      addVariant(inner);
+      return before;
+    });
+
+  const base = collapse(fold(song).replace(NOISE_ANYWHERE, ' ').replace(FEAT, ' '));
   return { artist, artistFromTitle: Boolean(split), base, tags: [...tags].sort() };
 }
 
