@@ -1,6 +1,6 @@
 import type { Album, Track } from '@dsmn/shared';
 import { memo, type ReactNode } from 'react';
-import { formatDuration } from '../lib/format.ts';
+import { formatDuration } from '@dsmn/shared';
 
 interface Props {
   tracks: Track[];

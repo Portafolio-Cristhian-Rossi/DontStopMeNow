@@ -33,10 +33,20 @@ export class YtDlpError extends Error {}
 
 const STALL_MS = 300_000;
 /**
- * YouTube exige resolver desafíos de JavaScript; yt-dlp solo busca deno por defecto y sin runtime recibe 403. El
- * servidor siempre corre sobre Node, así que se lo pasamos.
+ * Runtime de JavaScript para yt-dlp: YouTube exige resolver desafíos de JS, yt-dlp solo busca deno por defecto y sin
+ * runtime puede recibir 403. Desde el código el servidor corre sobre Node y se lo pasamos; en el ejecutable
+ * empaquetado `execPath` es DontStopMeNow.exe (no sirve como node), así que se usa el node del PATH si hay, o
+ * ninguno (yt-dlp prueba deno).
  */
-const JS_RUNTIME = ['--js-runtimes', `node:${process.execPath}`];
+export function jsRuntimeFor(o: {
+  bundled: boolean;
+  execPath: string;
+  findOnPath: (name: string) => string | null;
+}): string | null {
+  if (!o.bundled) return `node:${o.execPath}`;
+  const node = o.findOnPath('node');
+  return node ? `node:${node}` : null;
+}
 const CONVERT_LINE = /^\[(ExtractAudio|EmbedThumbnail|Metadata)\]/;
 
 interface RunOptions {
@@ -53,8 +63,16 @@ function kill(pid: number | undefined, child: { kill(): boolean }) {
   }
 }
 
-export function createYtDlp(o: { command: string; prefixArgs?: string[]; stallMs?: number }): YtDlp {
+export function createYtDlp(o: {
+  command: string;
+  prefixArgs?: string[];
+  stallMs?: number;
+  /** `node:<ruta>` para --js-runtimes; null no lo pasa. Por defecto, el Node que corre este proceso. */
+  jsRuntime?: string | null;
+}): YtDlp {
   const stallMs = o.stallMs ?? STALL_MS;
+  const runtime = o.jsRuntime === undefined ? `node:${process.execPath}` : o.jsRuntime;
+  const JS_RUNTIME = runtime ? ['--js-runtimes', runtime] : [];
 
   function run(args: string[], opts: RunOptions = {}): Promise<string> {
     return new Promise((resolve, reject) => {

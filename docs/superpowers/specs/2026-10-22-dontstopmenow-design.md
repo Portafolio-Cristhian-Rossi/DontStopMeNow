@@ -43,7 +43,7 @@ letras, estadísticas, transcodificación, cliente iOS.
 | Servidor          | Node 24 LTS + Fastify, nativo (sin Docker)                          | Docker Desktop en Windows rompe la detección de cambios en archivos y el mDNS; Node ya es multiplataforma |
 | Base del servidor | SQLite vía `node:sqlite`                                            | Un solo archivo, sin instalar nada                                                                        |
 | Web de gestión    | React + Vite, servida por el propio servidor                        | Sin app de escritorio aparte                                                                              |
-| App móvil         | Expo (React Native) + `react-native-track-player`                   | Un solo lenguaje; reproductor con soporte de segundo plano sobre Media3/ExoPlayer                         |
+| App móvil         | Expo (React Native) + `expo-audio`                                  | Un solo lenguaje; reproductor del SDK de Expo (Media3/ExoPlayer) con cola nativa y segundo plano          |
 | Organización      | Biblioteca por metadata; carpetas ignoradas salvo listas de carpeta | Así organiza el usuario                                                                                   |
 | Docker            | `Dockerfile` opcional para Linux, en la etapa de empaquetado        | Portabilidad sin depender de Docker en Windows                                                            |
 
@@ -206,7 +206,7 @@ Los artistas no viajan aparte: la web y el celular los derivan de `albums` y `tr
 ### 5.5 QR de vinculación
 
 El QR contiene JSON: `{ "v": 1, "serverId", "urls": ["http://192.168.x.y:4747", ...], "code" }`
-con todas las IPv4 privadas de la compu. El celular prueba las URLs en orden.
+con todas las IPv4 privadas de la compu. El celular prueba las URLs en paralelo y usa la primera que responde.
 
 ## 6. Sincronización
 
@@ -214,7 +214,9 @@ con todas las IPv4 privadas de la compu. El celular prueba las URLs en orden.
 
 ```
 server       (server_id, name, last_url, token)
-catalog_*    copia del último catálogo recibido (tracks, albums, playlists, revision)
+catalog      último catálogo recibido, como JSON en una fila (con su ETag)
+partials     estado de pausa de descargas a medio terminar (para retomarlas)
+failures     canciones que fallaron en la última sincronización
 selection    (kind: 'album'|'playlist', id)
 downloads    (track_id, fingerprint, local_path, size)
 player_state (queue, index, position_ms, repeat, shuffle)
@@ -238,13 +240,22 @@ player_state (queue, index, position_ms, repeat, shuffle)
   avisa cuánto falta y no se empieza.
 - Se aplican primero los borrados (excepto la canción que está sonando, que queda para
   la próxima sincronización) y después las descargas.
-- Descargas: 2 en paralelo. Cada una escribe en `<id>.part`; si ya existe, retoma con
-  `Range: bytes=<tamaño>-` e `If-Range: "<fingerprint>"` (si el archivo cambió en la compu, el servidor responde `200` y se reescribe desde cero). Al terminar, verifica el tamaño, renombra a `<id>.<ext>` y
-  registra en `downloads`.
+- Descargas: 2 en paralelo, con `DownloadTask` de expo-file-system, a `<id>.part`.
+  - Si la app pasa a segundo plano o el usuario toca "Detener", la descarga se pausa y su
+    estado (`savable`) se guarda en `partials`; la próxima vez se retoma desde ahí.
+  - Si la descarga falla por un error de red no hay estado para retomar: se reintenta desde
+    cero.
+  - **Toda descarga terminada se verifica con la huella** (misma fórmula que el servidor,
+    `fingerprintFromWindows` de `@dsmn/shared`). Si coincide, se renombra a `<id>.<ext>` y se
+    registra en `downloads`; si no, se borra y se baja de nuevo completa una vez. Un `.part`
+    nunca se registra como descargado.
+  - El servidor igualmente envía `ETag` y respeta `If-Range`.
 - Error de red o 5xx: hasta 3 reintentos con espera creciente (2 s, 4 s, 8 s). Si sigue
   fallando, se marca la canción como fallida y se continúa; al final se muestra el resumen.
 - Si se pierde la conexión con el servidor, se detiene; lo ya bajado queda.
 - Archivos en el almacenamiento privado de la app (`documentDirectory/music/`).
+- Al terminar sin pausa ni errores, se bajan las portadas de lo descargado a `documentDirectory/covers/` y se
+  borran las que ya no se usan; la biblioteca y la pantalla de bloqueo las leen de ahí (se ven sin conexión).
 
 ### 6.4 Cuándo
 
@@ -270,11 +281,17 @@ Al abrir la app si el servidor responde, y con el botón "Sincronizar".
 Se guarda `serverId` y la última URL. Si la URL no responde, se busca por mDNS un
 servicio `_dontstopmenow._tcp` con ese `serverId` y se actualiza la URL.
 
-### 7.3 Reproductor (react-native-track-player)
+### 7.3 Reproductor (expo-audio)
+
+Se usa `AudioPlaylist` de expo-audio y no react-native-track-player: este último no publica versiones desde
+marzo de 2026 y su módulo es de la arquitectura vieja de React Native, que RN 0.88 ya no incluye. La cola es
+nativa (sigue avanzando en segundo plano sin depender de JS); el aleatorio se arma cargando la cola ya
+mezclada.
 
 - Reproducción en segundo plano; controles en notificación y pantalla de bloqueo.
 - Botones de auriculares/Bluetooth.
-- Foco de audio: pausa en llamadas, baja el volumen con notificaciones.
+- Foco de audio: pausa en llamadas. Con notificaciones de otras apps, expo-audio pausa un instante y retoma
+  (en lugar de bajar el volumen).
 - Pausa al desconectar auriculares.
 - Cola: reproducir álbum/lista reemplaza la cola; "Reproducir a continuación" y
   "Agregar a la cola".
@@ -315,8 +332,9 @@ Datos con TanStack Query; navegación con React Router.
     prueba de menos de 1 s generados en los fixtures, base SQLite temporal. Incluye
     auth (localhost vs red), `Range`, `ETag`/`304`, vinculación.
 - **`apps/web`:** Vitest + Testing Library en editor de listas y ajustes de carpetas.
-- **`apps/mobile`:** Jest para la lógica (gestor de descargas con red simulada,
-  restauración de estado). Reproductor y descargas reales: lista de verificación
+- **`apps/mobile`:** Vitest para la lógica de `src/core` (sincronización con red y archivos
+  simulados, almacenamiento local sobre `node:sqlite`, vinculación, descubrimiento); las
+  pantallas se verifican con typecheck y `expo export`. Reproductor y descargas reales: lista de verificación
   manual en el dispositivo.
 - **CI (GitHub Actions):** lint, typecheck y tests en cada push.
 
@@ -333,3 +351,8 @@ termina con algo que funciona y se puede probar.
 4. **App móvil — reproductor.**
 5. **Empaquetado:** ejecutable para Windows (Node SEA), `Dockerfile` opcional para
    Linux, README de instalación.
+
+Las cinco etapas están implementadas. Distribución: el workflow `Release` arma
+`DontStopMeNow-windows-x64.zip` y `DontStopMeNow-linux-x64.zip` (ejecutable autocontenido + `web/` +
+`LEEME.txt`) y los publica al crear un tag `v*`; en Linux también hay `Dockerfile` y `docker-compose.yml`
+(red del host). La app Android se compila con EAS (ver `apps/mobile/README.md`).

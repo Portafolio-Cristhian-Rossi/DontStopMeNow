@@ -1,9 +1,8 @@
-import { sanitizeFolderName, type AnalyzedEntry, type Preview } from '@dsmn/shared';
+import { formatDuration, sanitizeFolderName, type AnalyzedEntry, type Preview } from '@dsmn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../api/client.ts';
 import { queryKeys, useRoots } from '../api/queries.ts';
-import { formatDuration } from '../lib/format.ts';
 
 interface Props {
   preview: Preview;

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildDownloadArgs } from '../../src/downloads/recipe.ts';
-import { createYtDlp, type YtDlp } from '../../src/downloads/ytdlp.ts';
+import { createYtDlp, jsRuntimeFor, type YtDlp } from '../../src/downloads/ytdlp.ts';
 import { tmpDir } from '../helpers/fixtures.ts';
 import { fakeCalls, installFakeYtDlp } from '../helpers/ytdlp.ts';
 
@@ -106,6 +106,29 @@ describe('adaptador de yt-dlp', () => {
     expect(preview!.slice(0, 2)).toEqual(runtime);
     expect(download!.slice(0, 2)).toEqual(runtime);
     expect(version).toEqual(['--version']);
+  });
+
+  it('sin runtime JS (ejecutable sin node en el PATH) no pasa --js-runtimes', async () => {
+    const noRuntime = createYtDlp({ command: process.execPath, prefixArgs: [fake], jsRuntime: null });
+    await noRuntime.preview('https://www.youtube.com/watch?v=ok7');
+    expect(lastCall()[0]).toBe('--flat-playlist');
+  });
+
+  it('jsRuntimeFor: desde el código usa el Node del servidor; en el ejecutable, el node del PATH o ninguno', () => {
+    const onPath = (found: string | null) => (name: string) => (name === 'node' ? found : null);
+    expect(jsRuntimeFor({ bundled: false, execPath: 'C:\\node\\node.exe', findOnPath: onPath(null) })).toBe(
+      'node:C:\\node\\node.exe',
+    );
+    expect(
+      jsRuntimeFor({
+        bundled: true,
+        execPath: 'C:\\App\\DontStopMeNow.exe',
+        findOnPath: onPath('C:\\n\\node.exe'),
+      }),
+    ).toBe('node:C:\\n\\node.exe');
+    expect(
+      jsRuntimeFor({ bundled: true, execPath: 'C:\\App\\DontStopMeNow.exe', findOnPath: onPath(null) }),
+    ).toBe(null);
   });
 
   it('fuerza UTF-8 en la salida de yt-dlp (títulos y rutas con tildes)', async () => {

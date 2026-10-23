@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { DEFAULT_PORT } from '@dsmn/shared';
+import { defaultWebDir } from './runtime.ts';
 
 export interface Config {
   dataDir: string;
@@ -17,6 +17,7 @@ export function loadConfig(
   platform: NodeJS.Platform,
   homedir: string,
   exists: (p: string) => boolean = existsSync,
+  defaultWeb: string = defaultWebDir(),
 ): Config {
   const p = platform === 'win32' ? path.win32 : path.posix;
   const dataDir =
@@ -33,7 +34,7 @@ export function loadConfig(
     }
   }
 
-  const webCandidate = env.DSMN_WEB_DIR ?? fileURLToPath(new URL('../../web/dist', import.meta.url));
+  const webCandidate = env.DSMN_WEB_DIR ?? defaultWeb;
   const webDir = exists(path.join(webCandidate, 'index.html')) ? webCandidate : null;
 
   return {

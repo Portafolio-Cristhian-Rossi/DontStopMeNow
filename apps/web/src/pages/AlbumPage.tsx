@@ -4,7 +4,7 @@ import { useCatalog } from '../api/queries.ts';
 import { AddToPlaylistDialog } from '../components/AddToPlaylistDialog.tsx';
 import { Cover } from '../components/Cover.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
-import { formatDuration } from '../lib/format.ts';
+import { formatDuration } from '@dsmn/shared';
 
 export function AlbumPage() {
   const { id } = useParams();

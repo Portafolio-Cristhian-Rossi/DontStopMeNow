@@ -1,0 +1,56 @@
+import type { Album, Catalog, Playlist, Selection, Track } from '@dsmn/shared';
+
+export interface LibraryView {
+  albums: Album[];
+  artists: { name: string; albumIds: string[] }[];
+  playlists: Playlist[];
+  tracks: Track[];
+}
+
+/** La biblioteca que se puede escuchar sin conexión: solo lo que ya está descargado. */
+export function libraryView(catalog: Catalog, downloadedIds: Set<string>): LibraryView {
+  const keep = (ids: string[]) => ids.filter((id) => downloadedIds.has(id));
+  const albums = catalog.albums
+    .map((a) => ({ ...a, trackIds: keep(a.trackIds) }))
+    .filter((a) => a.trackIds.length > 0);
+  const playlists = catalog.playlists
+    .map((p) => ({ ...p, trackIds: keep(p.trackIds) }))
+    .filter((p) => p.trackIds.length > 0);
+
+  const byArtist = new Map<string, string[]>();
+  for (const a of albums) byArtist.set(a.artist, [...(byArtist.get(a.artist) ?? []), a.id]);
+  const artists = [...byArtist]
+    .map(([name, albumIds]) => ({ name, albumIds }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+  return { albums, artists, playlists, tracks: catalog.tracks.filter((t) => downloadedIds.has(t.id)) };
+}
+
+function selectedTrackIds(catalog: Catalog, selection: Selection[]): Set<string> {
+  const albums = new Map(catalog.albums.map((a) => [a.id, a.trackIds]));
+  const playlists = new Map(catalog.playlists.map((p) => [p.id, p.trackIds]));
+  const ids = new Set<string>();
+  for (const sel of selection) {
+    for (const id of (sel.kind === 'album' ? albums : playlists).get(sel.id) ?? []) ids.add(id);
+  }
+  return ids;
+}
+
+/** Función que suma tamaños de canciones; arma el índice una sola vez por catálogo. */
+export function sizeLookup(catalog: Catalog): (trackIds: string[]) => number {
+  const sizes = new Map(catalog.tracks.map((t) => [t.id, t.size]));
+  return (trackIds) => trackIds.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0);
+}
+
+/** Cuántas canciones distintas y cuántos bytes suma la selección (las compartidas cuentan una vez). */
+export function selectionSummary(
+  catalog: Catalog,
+  selection: Selection[],
+): { trackCount: number; bytes: number } {
+  const ids = selectedTrackIds(catalog, selection);
+  return { trackCount: ids.size, bytes: sizeLookup(catalog)([...ids]) };
+}
+
+export function entrySize(catalog: Catalog, trackIds: string[]): number {
+  return sizeLookup(catalog)(trackIds);
+}
