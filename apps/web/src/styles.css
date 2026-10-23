@@ -281,6 +281,55 @@ dialog {
   box-shadow: 0 20px 60px rgb(0 0 0 / 0.3);
 }
 
+.folder-dialog {
+  position: fixed;
+  top: 10vh;
+  z-index: 20;
+  width: min(38rem, 92vw);
+}
+
+.folder-dialog h2 {
+  margin-top: 0;
+}
+
+.folder-dialog button.active {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.folder-current {
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+}
+
+.folder-list {
+  max-height: 45vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.folder-list li {
+  padding: 0;
+}
+
+.folder-list li.muted {
+  padding: 0.5rem 0.75rem;
+}
+
+.folder-row {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.folder-actions {
+  justify-content: flex-end;
+  margin: 1rem 0 0;
+}
+
 .list-plain {
   list-style: none;
   padding: 0;

@@ -1,11 +1,11 @@
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, parse } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getRevision } from '../../src/db/meta.ts';
 import { EventBus } from '../../src/events.ts';
 import { createPlaylist } from '../../src/library/playlists.ts';
-import { addRoot, browse, listRoots, removeRoot } from '../../src/library/roots.ts';
+import { addRoot, browse, listFolders, listPlaces, listRoots, removeRoot } from '../../src/library/roots.ts';
 import { createScanner } from '../../src/scan/scanner.ts';
 import { makeDb, makeLibrary, tmpDir } from '../helpers/fixtures.ts';
 import { makeMp3 } from '../helpers/mp3.ts';
@@ -53,6 +53,38 @@ describe('roots', () => {
     expect(() => browse(db, 999, '')).toThrow(status(404));
     db.prepare("UPDATE roots SET status = 'offline'").run();
     expect(() => browse(db, root.id, '')).toThrow(status(409));
+  });
+
+  it('listFolders recorre cualquier carpeta absoluta y oculta las del sistema', async () => {
+    const dir = await tmpDir();
+    for (const d of ['Rock', 'jazz', '.oculta', '$RECYCLE.BIN', 'Rock/Clásico']) await mkdir(join(dir, d));
+    expect(listFolders(dir)).toEqual({
+      path: dir,
+      parent: parse(dir).dir,
+      folders: [
+        { name: 'jazz', path: join(dir, 'jazz') },
+        { name: 'Rock', path: join(dir, 'Rock') },
+      ],
+    });
+    expect(listFolders(join(dir, 'Rock')).parent).toBe(dir);
+    const root = parse(dir).root;
+    expect(listFolders(root).parent).toBeNull();
+    expect(() => listFolders('relativa')).toThrow(status(400));
+    expect(() => listFolders('')).toThrow(status(400));
+    expect(() => listFolders(join(dir, 'no-existe'))).toThrow(status(400));
+  });
+
+  it('listPlaces muestra solo las carpetas del usuario que existen y la raíz del disco', async () => {
+    const home = await tmpDir();
+    await mkdir(join(home, 'Music'));
+    await mkdir(join(home, 'Descargas'));
+    const places = listPlaces(home);
+    expect(places.slice(0, 3)).toEqual([
+      { name: 'Música', path: join(home, 'Music') },
+      { name: 'Descargas', path: join(home, 'Descargas') },
+      { name: 'Carpeta personal', path: home },
+    ]);
+    expect(places.map((p) => p.path)).toContain(parse(home).root);
   });
 
   it('removeRoot borra canciones, álbumes y listas de carpeta', async () => {

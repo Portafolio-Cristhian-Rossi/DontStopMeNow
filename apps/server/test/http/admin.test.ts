@@ -46,6 +46,18 @@ describe('rutas de gestión', () => {
     expect((await app.inject({ url: '/api/catalog' })).json().tracks).toHaveLength(0);
   });
 
+  it('explorador del sistema: accesos y subcarpetas', async () => {
+    const { app } = await makeApp();
+    const dir = await makeLibrary({ 'Rock/a.mp3': makeMp3({}) });
+    const places = await app.inject({ url: '/api/admin/fs/places' });
+    expect(places.statusCode).toBe(200);
+    expect(places.json().length).toBeGreaterThan(0);
+    const r = await app.inject({ url: `/api/admin/fs?${new URLSearchParams({ path: dir })}` });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ path: dir, folders: [{ name: 'Rock', path: join(dir, 'Rock') }] });
+    expect((await app.inject({ url: '/api/admin/fs?path=relativa' })).statusCode).toBe(400);
+  });
+
   it('cuerpo inválido → 400', async () => {
     const { app } = await makeApp();
     const r = await app.inject({ method: 'POST', url: '/api/admin/playlists', payload: { type: 'manual' } });
