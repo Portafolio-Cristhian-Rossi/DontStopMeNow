@@ -21,7 +21,7 @@ const DEVICES_POLL_MS = 2500;
 
 function PairingCard({ deviceCount }: { deviceCount: number | undefined }) {
   const pairing = useQuery({
-    queryKey: ['pairing-code'],
+    queryKey: queryKeys.pairingCode,
     queryFn: api.pairingCode,
     staleTime: Infinity,
     gcTime: 0,

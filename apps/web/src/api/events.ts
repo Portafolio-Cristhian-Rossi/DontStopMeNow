@@ -39,10 +39,28 @@ export function useServerEvents(): ServerEvents {
         invalidate([queryKeys.downloadJobs, queryKeys.ytSources]);
       }
     };
+    // Si la conexión se vuelve a abrir, el servidor pudo haberse reiniciado: los datos pueden estar viejos y el
+    // código de vinculación en pantalla ya no existe (vive solo en la memoria del servidor).
+    let opened = false;
+    const onOpen = () => {
+      if (opened) {
+        invalidate([
+          queryKeys.catalog,
+          queryKeys.roots,
+          queryKeys.issues,
+          queryKeys.devices,
+          queryKeys.downloadJobs,
+          queryKeys.pairingCode,
+        ]);
+      }
+      opened = true;
+    };
+    source.addEventListener('open', onOpen);
     source.addEventListener('scan', onScan);
     source.addEventListener('revision', onRevision);
     source.addEventListener('download', onDownload);
     return () => {
+      source.removeEventListener('open', onOpen);
       source.removeEventListener('scan', onScan);
       source.removeEventListener('revision', onRevision);
       source.removeEventListener('download', onDownload);

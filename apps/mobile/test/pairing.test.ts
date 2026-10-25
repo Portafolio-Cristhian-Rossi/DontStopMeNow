@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ServerError } from '../src/core/http.ts';
-import { pairManually, pairWithQr, parseQr, pickReachableUrl } from '../src/core/pairing.ts';
+import { ServerError, ServerUnreachableError } from '../src/core/http.ts';
+import {
+  describePairingError,
+  pairManually,
+  pairWithQr,
+  parseQr,
+  pickReachableUrl,
+} from '../src/core/pairing.ts';
 import { fakeFetch } from './helpers.ts';
 
 const DEAD = 'http://172.20.0.1:4747';
@@ -77,5 +83,30 @@ describe('vinculación', () => {
     });
     expect(parseQr('https://example.com')).toBeNull();
     expect(parseQr('{"v":2}')).toBeNull();
+  });
+});
+
+describe('describePairingError', () => {
+  it('la compu no responde: nombra las direcciones probadas y ofrece reintentar', () => {
+    const p = describePairingError(new ServerUnreachableError(), [LIVE, DEAD]);
+    expect(p).toMatchObject({ title: 'No llegamos a tu compu', retry: true });
+    expect(p.body).toContain('Ni 192.168.1.10:4747 ni 172.20.0.1:4747 responden.');
+    expect(describePairingError(new ServerUnreachableError(), [LIVE]).body).toMatch(
+      /^192.168.1.10:4747 no responde./,
+    );
+  });
+
+  it('código vencido o ya usado (401): pide generar otro, sin reintentar', () => {
+    const p = describePairingError(new ServerError(401, 'unauthorized', 'Código inválido o vencido'));
+    expect(p).toMatchObject({ title: 'El código ya venció', retry: false });
+    expect(p.body).toContain('Generar otro código');
+  });
+
+  it('cualquier otro error muestra el mensaje tal cual', () => {
+    expect(describePairingError(new ServerError(500, 'internal', 'Se cayó'))).toEqual({
+      title: 'No se pudo vincular',
+      body: 'Se cayó',
+      retry: true,
+    });
   });
 });

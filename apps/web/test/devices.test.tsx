@@ -1,8 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
-import { callsTo, fakeServer, makeCatalog, renderWithProviders } from './utils.tsx';
+import { FakeEventSource, callsTo, fakeServer, makeCatalog, renderWithProviders } from './utils.tsx';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -63,6 +63,23 @@ describe('dispositivos', () => {
     renderWithProviders(<App />, { route: '/dispositivos' });
     expect(await screen.findByText('La compu no está conectada a una red local')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Código QR de vinculación' })).not.toBeInTheDocument();
+  });
+
+  it('si se reconecta al servidor (se reinició), pide un código nuevo', async () => {
+    let next = 'PRIMER';
+    fakeServer({
+      'GET /api/catalog': () => makeCatalog(),
+      'POST /api/admin/pairing-code': () => pairing(next, 300_000),
+      'GET /api/admin/devices': () => [],
+    });
+    renderWithProviders(<App />, { route: '/dispositivos' });
+    expect(await screen.findByText('PRIMER')).toBeInTheDocument();
+    act(() => FakeEventSource.last.emit('open', null));
+    // La primera apertura es la conexión inicial: no cambia nada.
+    expect(screen.getByText('PRIMER')).toBeInTheDocument();
+    next = 'NUEVO2';
+    act(() => FakeEventSource.last.emit('open', null));
+    expect(await screen.findByText('NUEVO2')).toBeInTheDocument();
   });
 
   it('revoca un dispositivo', async () => {
