@@ -68,6 +68,8 @@ export interface PlayerEngine {
   skipTo(index: number): void;
   seekTo(ms: number): void;
   setLoop(mode: EngineLoop): void;
+  /** Velocidad de reproducción (1 = normal); se mantiene al cargar otra cola. */
+  setRate(rate: number): void;
   insert(source: { uri: string }, index: number): void;
   add(source: { uri: string }): void;
   remove(index: number): void;

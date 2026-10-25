@@ -7,6 +7,8 @@ export type StoredDownload = LocalDownload & { path: string; size: number };
 export interface SavedPlayerState {
   queue: QueueState;
   positionMs: number;
+  /** Velocidad elegida; los estados guardados por versiones anteriores no la tienen. */
+  rate?: number;
 }
 
 const SCHEMA = `

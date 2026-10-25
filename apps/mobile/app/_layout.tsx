@@ -55,7 +55,10 @@ export default function RootLayout() {
               />
               <Stack.Screen name="album/[id]" options={{ title: 'Álbum' }} />
               <Stack.Screen name="lista/[id]" options={{ title: 'Lista' }} />
-              <Stack.Screen name="reproductor" options={{ title: 'Reproduciendo', presentation: 'modal' }} />
+              <Stack.Screen
+                name="reproductor"
+                options={{ title: 'Reproduciendo', presentation: 'modal', headerShown: false }}
+              />
             </Stack>
           </PlayerProvider>
         </AppProvider>

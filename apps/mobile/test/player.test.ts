@@ -1,5 +1,5 @@
 import type { Catalog } from '@dsmn/shared';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlayerController } from '../src/core/player/controller.ts';
 import { LocalStore } from '../src/core/store.ts';
 import type { PlayerEngine } from '../src/core/types.ts';
@@ -44,6 +44,7 @@ function fakeEngine() {
     skipTo: (i) => calls.push(['skipTo', i]),
     seekTo: (ms) => calls.push(['seekTo', ms]),
     setLoop: (mode) => calls.push(['setLoop', mode]),
+    setRate: (rate) => calls.push(['setRate', rate]),
     insert: (source, i) => calls.push(['insert', source.uri, i]),
     add: (source) => calls.push(['add', source.uri]),
     remove: (i) => calls.push(['remove', i]),
@@ -342,5 +343,96 @@ describe('PlayerController', () => {
     for (let i = 0; i < 50; i++) engine.emitStatus();
     await Promise.resolve();
     expect(n).toBe(1);
+  });
+});
+
+describe('PlayerController: velocidad, temporizador y cola', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('la velocidad llega al motor, sigue en una cola nueva y se recuerda al retomar', () => {
+    const { controller, engine, store } = setup();
+    controller.playList(['t1', 't2'], 0);
+    controller.setRate(1.25);
+    expect(lastCall(engine, 'setRate')).toEqual(['setRate', 1.25]);
+    controller.playList(['t3', 't4'], 0);
+    expect(lastCall(engine, 'setRate')).toEqual(['setRate', 1.25]);
+    expect(store.getPlayerState()?.rate).toBe(1.25);
+
+    const again = new PlayerController({
+      engine: fakeEngine(),
+      store,
+      files: memoryFiles(),
+      catalog: () => null,
+      downloadPath: (id) => `/music/${id}.mp3`,
+    });
+    again.restore();
+    expect(again.getSnapshot().rate).toBe(1.25);
+  });
+
+  it('"al terminar la canción" pausa en el cambio automático, no en uno pedido', () => {
+    const { controller, engine } = setup();
+    controller.playList(['t1', 't2', 't3'], 0);
+    controller.setSleep({ kind: 'end' });
+    controller.next();
+    engine.emitTrack(1);
+    expect(engine.status_.playing).toBe(true);
+    expect(controller.getSnapshot().sleep).toEqual({ kind: 'end' });
+    engine.emitTrack(2);
+    expect(engine.status_.playing).toBe(false);
+    expect(controller.getSnapshot().sleep).toEqual({ kind: 'off' });
+  });
+
+  it('el temporizador por minutos pausa al vencer y se puede apagar', () => {
+    vi.useFakeTimers();
+    const { controller, engine } = setup();
+    controller.playList(['t1', 't2'], 0);
+    controller.setSleep({ kind: 'timer', minutes: 15 });
+    expect(controller.getSnapshot().sleep).toMatchObject({ kind: 'timer', minutes: 15 });
+    vi.advanceTimersByTime(15 * 60_000 - 1);
+    expect(engine.status_.playing).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(engine.status_.playing).toBe(false);
+    expect(controller.getSnapshot().sleep).toEqual({ kind: 'off' });
+
+    engine.status_.playing = true;
+    controller.setSleep({ kind: 'timer', minutes: 30 });
+    controller.setSleep({ kind: 'off' });
+    vi.advanceTimersByTime(31 * 60_000);
+    expect(engine.status_.playing).toBe(true);
+  });
+
+  it('quitar, mover y limpiar lo que viene dejan el motor igual que la cola', () => {
+    const { controller, engine } = setup();
+    controller.playList(['t1', 't2', 't3', 't4'], 0);
+    engine.calls.length = 0;
+    controller.removeAt(2);
+    expect(engine.calls).toEqual([['remove', 2]]);
+    expect(controller.getSnapshot().queue?.order).toEqual(['t1', 't2', 't4']);
+
+    engine.calls.length = 0;
+    controller.move(2, 1);
+    expect(engine.calls).toEqual([
+      ['remove', 2],
+      ['insert', '/music/t4.mp3', 1],
+    ]);
+    expect(controller.getSnapshot().queue?.order).toEqual(['t1', 't4', 't2']);
+
+    engine.calls.length = 0;
+    controller.clearUpcoming();
+    expect(engine.calls).toEqual([
+      ['remove', 2],
+      ['remove', 1],
+    ]);
+    expect(controller.getSnapshot().queue?.order).toEqual(['t1']);
+  });
+
+  it('no deja quitar ni mover la canción que suena', () => {
+    const { controller, engine } = setup();
+    controller.playList(['t1', 't2', 't3'], 1);
+    engine.calls.length = 0;
+    controller.removeAt(1);
+    controller.removeAt(0);
+    controller.move(1, 2);
+    expect(engine.calls).toEqual([]);
   });
 });
