@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { DownloadProgressContext, ScanStatusContext, useServerEvents } from '../api/events.ts';
 import { PlayerBar } from '../player/PlayerBar.tsx';
 import { PlayerProvider } from '../player/PlayerContext.tsx';
+import { AddToPlaylistHost } from './AddToPlaylistHost.tsx';
 import { Icon, type IconName } from './Icon.tsx';
 import { Toast } from './Toast.tsx';
 
@@ -56,6 +57,7 @@ export function Layout() {
             </main>
             <PlayerBar />
             <Toast />
+            <AddToPlaylistHost />
           </div>
         </PlayerProvider>
       </DownloadProgressContext.Provider>

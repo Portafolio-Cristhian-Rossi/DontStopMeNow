@@ -3,6 +3,7 @@ import { memo, type ReactNode } from 'react';
 import { formatDuration } from '@dsmn/shared';
 import { HeartButton } from './HeartButton.tsx';
 import { Icon } from './Icon.tsx';
+import { TrackMenu } from './TrackMenu.tsx';
 
 interface Props {
   tracks: Track[];
@@ -17,6 +18,8 @@ interface Props {
   onPlay?(index: number): void;
   /** La canción que está sonando, para resaltarla. */
   currentId?: string | null;
+  /** "Ir al álbum" en el menú de cada fila (no tiene sentido en la página del álbum). */
+  showAlbum?: boolean;
 }
 
 /** Celda del título: el botón de play (si hay), el título cortado con "…" y si no está disponible. */
@@ -70,6 +73,7 @@ interface RowProps {
   hasActions: boolean;
   playing: boolean;
   onPlay?(index: number): void;
+  showAlbum: boolean;
 }
 
 const TrackRow = memo(function TrackRow({
@@ -84,6 +88,7 @@ const TrackRow = memo(function TrackRow({
   hasActions,
   playing,
   onPlay,
+  showAlbum,
 }: RowProps) {
   const classes = [t.available ? '' : 'unavailable', playing ? 'playing' : ''].filter(Boolean).join(' ');
   return (
@@ -109,6 +114,9 @@ const TrackRow = memo(function TrackRow({
       <td className="secondary">{t.artist}</td>
       <td className="secondary">{albumTitle}</td>
       <td className="time">{formatDuration(t.durationMs)}</td>
+      <td className="more">
+        <TrackMenu track={t} showAlbum={showAlbum} />
+      </td>
       {hasActions && <td>{actions}</td>}
     </tr>
   );
@@ -124,6 +132,7 @@ export function TrackTable({
   numbered,
   onPlay,
   currentId,
+  showAlbum = true,
 }: Props) {
   return (
     <table>
@@ -135,6 +144,7 @@ export function TrackTable({
           <th>Artista</th>
           <th>Álbum</th>
           <th style={{ textAlign: 'right' }}>Duración</th>
+          <th aria-label="Opciones" />
           {actions && <th aria-label="Acciones" />}
         </tr>
       </thead>
@@ -153,6 +163,7 @@ export function TrackTable({
             hasActions={Boolean(actions)}
             playing={t.id === currentId}
             onPlay={onPlay}
+            showAlbum={showAlbum}
           />
         ))}
       </tbody>

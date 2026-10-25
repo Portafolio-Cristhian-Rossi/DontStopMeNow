@@ -127,6 +127,19 @@ const PATHS = {
   ),
   cerrar: <path d="M6 6l12 12M18 6L6 18" />,
   corazon: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />,
+  opciones: (
+    <>
+      <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </>
+  ),
+  aContinuacion: (
+    <>
+      <path d="M4 6h10M4 12h10M4 18h6" />
+      <path d="M16 15l5-3-5-3z" fill="currentColor" />
+    </>
+  ),
   arrastrar: (
     <>
       <circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none" />

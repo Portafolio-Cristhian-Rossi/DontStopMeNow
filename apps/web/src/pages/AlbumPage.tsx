@@ -81,6 +81,7 @@ export function AlbumPage() {
         albums={new Map([[album.id, album]])}
         onPlay={(index) => player.playList(ids, index)}
         currentId={currentId}
+        showAlbum={false}
       />
     </>
   );

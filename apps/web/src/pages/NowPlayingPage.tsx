@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { requestAddToPlaylist } from '../components/addToPlaylist.ts';
 import { HeartButton } from '../components/HeartButton.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Disc } from '../player/Disc.tsx';
@@ -31,7 +32,13 @@ export function NowPlayingPage() {
         <div className="stage-info">
           <h1>{track.title}</h1>
           <p className="muted">{[track.artist, album?.title].filter(Boolean).join(' · ')}</p>
-          <HeartButton track={track} size={24} />
+          <div className="stage-actions">
+            <HeartButton track={track} size={24} />
+            <button type="button" className="pill" onClick={() => requestAddToPlaylist([track.id])}>
+              <Icon name="listas" size={18} />
+              Agregar a lista
+            </button>
+          </div>
         </div>
         <Progress snapshot={snapshot} player={player} />
         <Transport snapshot={snapshot} player={player} large />

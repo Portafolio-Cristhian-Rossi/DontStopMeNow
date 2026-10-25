@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api/client.ts';
 import { queryKeys, useCatalog } from '../api/queries.ts';
 
@@ -58,39 +58,52 @@ export function AddToPlaylistDialog({ trackIds, onClose }: Props) {
     });
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
-    <dialog open aria-labelledby="add-to-playlist-title">
-      <h2 id="add-to-playlist-title">Agregar {trackIds.length} canciones a…</h2>
-      {manual.length > 0 && (
-        <ul className="list-plain">
-          {manual.map((p) => (
-            <li key={p.id}>
-              <button type="button" disabled={busy} onClick={() => addTo(p.id)}>
-                {p.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form className="toolbar" onSubmit={create}>
-        <input
-          type="text"
-          aria-label="Nueva lista"
-          placeholder="Nueva lista"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button type="submit" className="primary" disabled={busy || !name.trim()}>
-          Crear
-        </button>
-      </form>
-      {info && <p className="muted">{info}</p>}
-      {error && <p className="error">{error}</p>}
-      <div className="toolbar">
-        <button type="button" onClick={() => onClose()}>
-          Cancelar
-        </button>
-      </div>
-    </dialog>
+    <>
+      <div className="modal-backdrop" aria-hidden="true" onClick={() => onClose()} />
+      <dialog open className="modal" aria-labelledby="add-to-playlist-title">
+        <h2 id="add-to-playlist-title">
+          {trackIds.length === 1 ? 'Agregar 1 canción a…' : `Agregar ${trackIds.length} canciones a…`}
+        </h2>
+        {manual.length > 0 && (
+          <ul className="list-plain">
+            {manual.map((p) => (
+              <li key={p.id}>
+                <button type="button" disabled={busy} onClick={() => addTo(p.id)}>
+                  {p.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form className="toolbar" onSubmit={create}>
+          <input
+            type="text"
+            aria-label="Nueva lista"
+            placeholder="Nueva lista"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button type="submit" className="primary" disabled={busy || !name.trim()}>
+            Crear
+          </button>
+        </form>
+        {info && <p className="muted">{info}</p>}
+        {error && <p className="error">{error}</p>}
+        <div className="toolbar">
+          <button type="button" onClick={() => onClose()}>
+            Cancelar
+          </button>
+        </div>
+      </dialog>
+    </>
   );
 }

@@ -1902,3 +1902,96 @@ td.fav {
 .toast[hidden] {
   display: none;
 }
+
+/* Menú de cada canción */
+
+td.more {
+  width: 44px;
+  padding: 0;
+}
+
+.track-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.track-menu > .icon-button {
+  color: var(--faint);
+}
+
+tbody tr:hover .track-menu > .icon-button,
+.track-menu > .icon-button[aria-expanded='true'] {
+  color: var(--text);
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.5);
+}
+
+.menu-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.menu [role='menuitem'] {
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.menu [role='menuitem']:hover,
+.menu [role='menuitem']:focus-visible {
+  background: var(--surface-3);
+  outline: none;
+}
+
+.stage-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Diálogos modales */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 0.55);
+}
+
+dialog.modal {
+  position: fixed;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 41;
+  width: min(30rem, 92vw);
+  max-height: 76vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+dialog.modal .list-plain button {
+  width: 100%;
+  justify-content: flex-start;
+}

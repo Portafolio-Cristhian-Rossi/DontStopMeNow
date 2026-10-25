@@ -25,6 +25,7 @@ import { displayPath } from '../components/FolderPicker.tsx';
 import { HeartButton } from '../components/HeartButton.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { TrackMenu } from '../components/TrackMenu.tsx';
 import { TitleCell, TrackTable } from '../components/TrackTable.tsx';
 import { useCurrentTrackId, usePlayerActions } from '../player/PlayerContext.tsx';
 import { formatDuration } from '@dsmn/shared';
@@ -63,6 +64,9 @@ function SortableRow({ id, index, track, album, last, busy, onMove, onRemove, pl
       <td className="secondary">{track.artist}</td>
       <td className="secondary">{album?.title ?? ''}</td>
       <td className="time">{formatDuration(track.durationMs)}</td>
+      <td className="more">
+        <TrackMenu track={track} />
+      </td>
       <td style={{ whiteSpace: 'nowrap' }}>
         <button
           type="button"
@@ -232,7 +236,8 @@ export function PlaylistPage() {
                   <th aria-label="Favorita" />
                   <th>Artista</th>
                   <th>Álbum</th>
-                  <th>Duración</th>
+                  <th style={{ textAlign: 'right' }}>Duración</th>
+                  <th aria-label="Opciones" />
                   <th aria-label="Acciones" />
                 </tr>
               </thead>
