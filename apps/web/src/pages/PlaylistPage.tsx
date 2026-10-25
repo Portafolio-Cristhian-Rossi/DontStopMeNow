@@ -18,10 +18,12 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Album, Track } from '@dsmn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type KeyboardEvent } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { api } from '../api/client.ts';
 import { queryKeys, useCatalog, useRoots } from '../api/queries.ts';
 import { displayPath } from '../components/FolderPicker.tsx';
+import { Icon } from '../components/Icon.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
 import { formatDuration } from '@dsmn/shared';
 
@@ -40,17 +42,19 @@ function SortableRow({ id, index, track, album, last, busy, onMove, onRemove }: 
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id, disabled: busy });
   return (
     <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
-      <td>
+      <td className="num">
         <span className="drag-handle" {...attributes} {...listeners} aria-label={`Arrastrar ${track.title}`}>
           ⠿
         </span>{' '}
         {index + 1}
       </td>
-      <td>{track.title}</td>
-      <td>{track.artist}</td>
-      <td>{album?.title ?? ''}</td>
-      <td>{formatDuration(track.durationMs)}</td>
-      <td>
+      <td className="title" title={track.title}>
+        <span>{track.title}</span>
+      </td>
+      <td className="secondary">{track.artist}</td>
+      <td className="secondary">{album?.title ?? ''}</td>
+      <td className="time">{formatDuration(track.durationMs)}</td>
+      <td style={{ whiteSpace: 'nowrap' }}>
         <button
           type="button"
           className="small"
@@ -150,7 +154,14 @@ export function PlaylistPage() {
 
   return (
     <>
-      <h1>{playlist.name}</h1>
+      <Link to="/listas" className="back-link">
+        <Icon name="volver" size={18} />
+        Listas
+      </Link>
+      <PageHeader
+        title={playlist.name}
+        subtitle={`${playlist.type === 'manual' ? 'Lista manual' : 'Lista de carpeta'} · ${entries.length} canciones`}
+      />
       <div className="toolbar">
         <input
           key={playlist.name}
@@ -163,9 +174,6 @@ export function PlaylistPage() {
         <button type="button" className="danger" disabled={busy} onClick={() => void destroy()}>
           Borrar lista
         </button>
-        <span className="muted">
-          {playlist.type === 'manual' ? 'Manual' : 'Carpeta'} · {entries.length} canciones
-        </span>
       </div>
       {actionError && <p className="error">{actionError}</p>}
       {playlist.type === 'folder' ? (

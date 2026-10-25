@@ -1,6 +1,8 @@
 import { Link } from 'react-router';
 import { useCatalog } from '../api/queries.ts';
+import { initials } from '../components/Cover.tsx';
 import { LibraryTabs } from '../components/LibraryTabs.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 
 export function ArtistsPage() {
   const { data, isPending, error } = useCatalog();
@@ -14,13 +16,22 @@ export function ArtistsPage() {
 
   return (
     <>
-      <h1>Biblioteca</h1>
+      <PageHeader
+        title="Biblioteca"
+        subtitle={`${artists.length} ${artists.length === 1 ? 'artista' : 'artistas'}`}
+      />
       <LibraryTabs />
-      <ul className="list-plain">
+      <ul className="list-plain artist-list">
         {artists.map(([name, n]) => (
           <li key={name}>
             <Link to={`/biblioteca/albumes?${new URLSearchParams({ artista: name }).toString()}`}>
-              <strong>{name}</strong> <span className="muted">· {n === 1 ? '1 álbum' : `${n} álbumes`}</span>
+              <span className="avatar" aria-hidden="true">
+                {initials(name)}
+              </span>
+              <span>
+                <strong className="ellipsis">{name}</strong>
+                <span className="muted">{n === 1 ? '1 álbum' : `${n} álbumes`}</span>
+              </span>
             </Link>
           </li>
         ))}

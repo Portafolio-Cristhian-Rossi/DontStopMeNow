@@ -1,7 +1,9 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useCatalog } from '../api/queries.ts';
 import { AddToPlaylistDialog } from '../components/AddToPlaylistDialog.tsx';
+import { Icon } from '../components/Icon.tsx';
 import { LibraryTabs } from '../components/LibraryTabs.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
 import { searchKey } from '@dsmn/shared';
 
@@ -48,22 +50,27 @@ export function SongsPage() {
 
   return (
     <>
-      <h1>Biblioteca</h1>
-      <LibraryTabs />
-      <div className="toolbar">
-        <input
-          type="search"
-          role="searchbox"
-          aria-label="Buscar canciones"
-          placeholder="Buscar por título, artista o álbum"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <span className="muted">{matches.length} canciones</span>
-        <button type="button" disabled={selected.size === 0} onClick={() => setAdding(true)}>
-          Agregar a lista… {selected.size > 0 && `(${selected.size})`}
-        </button>
-      </div>
+      <PageHeader title="Biblioteca" subtitle={`${matches.length} canciones`}>
+        <label className="search-field">
+          <Icon name="buscar" size={18} />
+          <input
+            type="search"
+            role="searchbox"
+            aria-label="Buscar canciones"
+            placeholder="Buscar por título, artista o álbum"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+      </PageHeader>
+      <LibraryTabs>
+        <div className="chips">
+          <button type="button" disabled={selected.size === 0} onClick={() => setAdding(true)}>
+            <Icon name="mas" size={18} />
+            Agregar a lista… {selected.size > 0 && `(${selected.size})`}
+          </button>
+        </div>
+      </LibraryTabs>
       {notice && (
         <p className="muted" role="status">
           {notice}

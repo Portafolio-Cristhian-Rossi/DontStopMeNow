@@ -4,6 +4,8 @@ import { Link } from 'react-router';
 import { api } from '../api/client.ts';
 import { useYtDlp } from '../api/queries.ts';
 import { DownloadQueue } from '../components/DownloadQueue.tsx';
+import { Icon } from '../components/Icon.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { PreviewTable } from '../components/PreviewTable.tsx';
 import { YtSources } from '../components/YtSources.tsx';
 
@@ -39,21 +41,26 @@ export function DownloadPage() {
 
   return (
     <>
-      <h1>Descargar</h1>
+      <PageHeader
+        title="Descargar"
+        subtitle="Bajá playlists o videos de YouTube con yt-dlp. Quedan en tu carpeta de música y aparecen solos en la Biblioteca."
+      />
       {ytdlp.data && !ready && (
         <p className="error" role="alert">
           Para descargar, configurá yt-dlp en <Link to="/ajustes">Ajustes</Link>
         </p>
       )}
-      <form className="toolbar" onSubmit={look}>
-        <input
-          type="text"
-          className="wide"
-          aria-label="Link de YouTube"
-          placeholder="Pegá un link de YouTube (playlist o video)"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
+      <form className="link-box" onSubmit={look}>
+        <label>
+          <Icon name="link" />
+          <input
+            type="text"
+            aria-label="Link de YouTube"
+            placeholder="Pegá un link de YouTube (playlist o video)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+        </label>
         <button type="submit" className="primary" disabled={loading || !url.trim()}>
           Ver
         </button>
@@ -73,8 +80,12 @@ export function DownloadPage() {
           }}
         />
       )}
-      <DownloadQueue />
-      <YtSources busy={loading} onCheck={(id) => void show(() => api.checkSource(id))} />
+      <section className="panel">
+        <DownloadQueue />
+      </section>
+      <section className="panel">
+        <YtSources busy={loading} onCheck={(id) => void show(() => api.checkSource(id))} />
+      </section>
     </>
   );
 }

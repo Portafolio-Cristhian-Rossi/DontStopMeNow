@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useCatalog } from '../api/queries.ts';
 import { AddToPlaylistDialog } from '../components/AddToPlaylistDialog.tsx';
 import { Cover } from '../components/Cover.tsx';
+import { Icon } from '../components/Icon.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
 import { formatDuration } from '@dsmn/shared';
 
@@ -27,14 +28,22 @@ export function AlbumPage() {
 
   return (
     <>
+      <Link to="/biblioteca/albumes" className="back-link">
+        <Icon name="volver" size={18} />
+        Biblioteca
+      </Link>
       <div className="album-header">
         <Cover coverId={album.coverId} title={album.title} />
         <div>
+          <span className="eyebrow">Álbum</span>
           <h1>{album.title}</h1>
-          <p className="muted">{details.join(' · ')}</p>
-          <button type="button" onClick={() => setAdding(true)}>
-            Agregar a lista…
-          </button>
+          <p>{details.join(' · ')}</p>
+          <div className="toolbar" style={{ margin: '6px 0 0' }}>
+            <button type="button" onClick={() => setAdding(true)}>
+              <Icon name="mas" size={18} />
+              Agregar a lista…
+            </button>
+          </div>
         </div>
       </div>
       {notice && (

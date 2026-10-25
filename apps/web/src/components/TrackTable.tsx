@@ -38,7 +38,7 @@ const TrackRow = memo(function TrackRow({
 }: RowProps) {
   return (
     <tr className={t.available ? undefined : 'unavailable'}>
-      <td>
+      <td className="num">
         {selectable ? (
           <input
             type="checkbox"
@@ -52,18 +52,20 @@ const TrackRow = memo(function TrackRow({
           (t.trackNo ?? '')
         )}
       </td>
-      <td>
-        {t.title}
-        {!t.available && (
-          <span className="muted">
-            {' '}
-            · <span>no disponible</span>
-          </span>
-        )}
+      <td className="title" title={t.title}>
+        <span>
+          {t.title}
+          {!t.available && (
+            <span className="muted">
+              {' '}
+              · <span>no disponible</span>
+            </span>
+          )}
+        </span>
       </td>
-      <td>{t.artist}</td>
-      <td>{albumTitle}</td>
-      <td>{formatDuration(t.durationMs)}</td>
+      <td className="secondary">{t.artist}</td>
+      <td className="secondary">{albumTitle}</td>
+      <td className="time">{formatDuration(t.durationMs)}</td>
       {hasActions && <td>{actions}</td>}
     </tr>
   );
@@ -78,7 +80,7 @@ export function TrackTable({ tracks, albums, selectable, selected, onToggle, act
           <th>Título</th>
           <th>Artista</th>
           <th>Álbum</th>
-          <th>Duración</th>
+          <th style={{ textAlign: 'right' }}>Duración</th>
           {actions && <th aria-label="Acciones" />}
         </tr>
       </thead>

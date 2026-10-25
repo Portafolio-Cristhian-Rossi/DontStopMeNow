@@ -41,6 +41,12 @@
           "recordAudioAndroid": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "436a5c9d-5dfa-46e6-81dc-0786fe47d412"
+      }
+    },
+    "owner": "cnr0551"
   }
 }

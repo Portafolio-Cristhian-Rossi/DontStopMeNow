@@ -1,12 +1,13 @@
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { DownloadProgressContext, ScanStatusContext, useServerEvents } from '../api/events.ts';
+import { Icon, type IconName } from './Icon.tsx';
 
-const SECTIONS = [
-  { to: '/biblioteca/albumes', label: 'Biblioteca', prefix: '/biblioteca' },
-  { to: '/listas', label: 'Listas', prefix: '/listas' },
-  { to: '/descargar', label: 'Descargar', prefix: '/descargar' },
-  { to: '/ajustes', label: 'Ajustes', prefix: '/ajustes' },
-  { to: '/dispositivos', label: 'Dispositivos', prefix: '/dispositivos' },
+const SECTIONS: { to: string; label: string; prefix: string; icon: IconName }[] = [
+  { to: '/biblioteca/albumes', label: 'Biblioteca', prefix: '/biblioteca', icon: 'biblioteca' },
+  { to: '/listas', label: 'Listas', prefix: '/listas', icon: 'listas' },
+  { to: '/descargar', label: 'Descargar', prefix: '/descargar', icon: 'descargar' },
+  { to: '/ajustes', label: 'Ajustes', prefix: '/ajustes', icon: 'ajustes' },
+  { to: '/dispositivos', label: 'Dispositivos', prefix: '/dispositivos', icon: 'dispositivos' },
 ];
 
 export function Layout() {
@@ -17,25 +18,35 @@ export function Layout() {
     <ScanStatusContext.Provider value={status}>
       <DownloadProgressContext.Provider value={downloads}>
         <div className="app">
-          <header className="topbar">
-            <span className="brand">DontStopMeNow</span>
-            <nav className="nav">
+          <aside className="sidebar">
+            <Link to="/" className="brand">
+              <span className="brand-mark">
+                <Icon name="logo" />
+              </span>
+              DontStopMeNow
+            </Link>
+            <nav className="nav" aria-label="Secciones">
               {SECTIONS.map((s) => (
                 <NavLink
                   key={s.to}
                   to={s.to}
                   className={pathname.startsWith(s.prefix) ? 'active' : undefined}
                 >
+                  <Icon name={s.icon} />
                   {s.label}
                 </NavLink>
               ))}
             </nav>
-            {status.running && (
-              <span className="scan-pill" role="status">
-                Escaneando… {status.processed}/{status.total}
+            <div className="server-status" role="status">
+              <strong>
+                <span className="dot" />
+                Servidor activo
+              </strong>
+              <span className="muted">
+                {status.running ? `Escaneando… ${status.processed}/${status.total}` : 'Biblioteca al día'}
               </span>
-            )}
-          </header>
+            </div>
+          </aside>
           <main className="content">
             <Outlet />
           </main>

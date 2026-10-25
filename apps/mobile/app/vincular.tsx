@@ -42,6 +42,7 @@ export default function Vincular() {
       await pair(await action());
       router.replace('/');
     } catch (err) {
+      console.log('[vincular] falló', err);
       if (qr) failedQr.current = qr;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -51,6 +52,7 @@ export default function Vincular() {
   }
 
   function onScanned({ data }: { data: string }) {
+    console.log('[vincular] QR leído', { data, inFlight: inFlight.current, repetido: data === failedQr.current });
     if (inFlight.current || data === failedQr.current) return;
     const payload = parseQr(data);
     if (!payload) {

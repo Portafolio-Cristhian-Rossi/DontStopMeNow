@@ -44,7 +44,7 @@ export function YtSources({ onCheck, busy }: Props) {
               ? `revisada ${new Date(s.lastCheckedAt).toLocaleString('es')}`
               : 'nunca revisada';
             return (
-              <li key={s.id} className="toolbar">
+              <li key={s.id} className="source-row">
                 <strong>{s.title}</strong>
                 {root && <span className="muted">{displayPath(root.path, s.folder)}</span>}
                 <span className="muted">{`${s.downloaded} canciones · ${checked}`}</span>
