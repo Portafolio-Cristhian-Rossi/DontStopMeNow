@@ -24,7 +24,8 @@ import { queryKeys, useCatalog, useRoots } from '../api/queries.ts';
 import { displayPath } from '../components/FolderPicker.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
-import { TrackTable } from '../components/TrackTable.tsx';
+import { TitleCell, TrackTable } from '../components/TrackTable.tsx';
+import { useCurrentTrackId, usePlayerActions } from '../player/PlayerContext.tsx';
 import { formatDuration } from '@dsmn/shared';
 
 interface RowProps {
@@ -36,21 +37,25 @@ interface RowProps {
   busy: boolean;
   onMove(from: number, to: number): void;
   onRemove(index: number): void;
+  playing: boolean;
+  onPlay(): void;
 }
 
-function SortableRow({ id, index, track, album, last, busy, onMove, onRemove }: RowProps) {
+function SortableRow({ id, index, track, album, last, busy, onMove, onRemove, playing, onPlay }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id, disabled: busy });
   return (
-    <tr ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
+    <tr
+      ref={setNodeRef}
+      className={playing ? 'playing' : undefined}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
       <td className="num">
         <span className="drag-handle" {...attributes} {...listeners} aria-label={`Arrastrar ${track.title}`}>
           ⠿
         </span>{' '}
         {index + 1}
       </td>
-      <td className="title" title={track.title}>
-        <span>{track.title}</span>
-      </td>
+      <TitleCell track={track} playing={playing} onPlay={onPlay} />
       <td className="secondary">{track.artist}</td>
       <td className="secondary">{album?.title ?? ''}</td>
       <td className="time">{formatDuration(track.durationMs)}</td>
@@ -93,6 +98,8 @@ export function PlaylistPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const player = usePlayerActions();
+  const currentId = useCurrentTrackId();
 
   if (isPending) return <p className="muted">Cargando…</p>;
   if (error) return <p className="error">{error.message}</p>;
@@ -107,6 +114,7 @@ export function PlaylistPage() {
     const track = tracksById.get(tid);
     return track ? [{ key: `${i}-${tid}`, index: i, track }] : [];
   });
+  const ids = entries.map((e) => e.track.id);
 
   async function act(action: () => Promise<unknown>) {
     setBusy(true);
@@ -163,6 +171,24 @@ export function PlaylistPage() {
         subtitle={`${playlist.type === 'manual' ? 'Lista manual' : 'Lista de carpeta'} · ${entries.length} canciones`}
       />
       <div className="toolbar">
+        <button
+          type="button"
+          className="primary pill"
+          disabled={ids.length === 0}
+          onClick={() => player.playList(ids, 0, { shuffle: false })}
+        >
+          <Icon name="play" size={18} />
+          Reproducir
+        </button>
+        <button
+          type="button"
+          className="pill"
+          disabled={ids.length === 0}
+          onClick={() => player.playList(ids, 0, { shuffle: true })}
+        >
+          <Icon name="aleatorio" size={18} />
+          Aleatorio
+        </button>
         <input
           key={playlist.name}
           type="text"
@@ -181,7 +207,13 @@ export function PlaylistPage() {
           <p className="muted">
             Carpeta: {root ? displayPath(root.path, playlist.folder!.relPath) : playlist.folder!.relPath}
           </p>
-          <TrackTable tracks={entries.map((e) => e.track)} albums={albums} numbered />
+          <TrackTable
+            tracks={entries.map((e) => e.track)}
+            albums={albums}
+            numbered
+            onPlay={(index) => player.playList(ids, index)}
+            currentId={currentId}
+          />
         </>
       ) : entries.length === 0 ? (
         <p className="empty">La lista está vacía. Agregá canciones desde la Biblioteca.</p>
@@ -211,6 +243,8 @@ export function PlaylistPage() {
                     busy={busy}
                     onMove={move}
                     onRemove={remove}
+                    playing={e.track.id === currentId}
+                    onPlay={() => player.playList(ids, i)}
                   />
                 ))}
               </tbody>

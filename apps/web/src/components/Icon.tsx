@@ -71,6 +71,71 @@ const PATHS = {
       <path d="M20 5v6h-6" />
     </>
   ),
+  play: <path d="M8 5l11 7-11 7z" fill="currentColor" />,
+  pausa: (
+    <>
+      <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none" />
+      <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  anterior: (
+    <>
+      <path d="M18 6L9 12l9 6z" fill="currentColor" />
+      <path d="M6 6v12" />
+    </>
+  ),
+  siguiente: (
+    <>
+      <path d="M6 6l9 6-9 6z" fill="currentColor" />
+      <path d="M18 6v12" />
+    </>
+  ),
+  aleatorio: (
+    <>
+      <path d="M16 4h4v4" />
+      <path d="M4 20L20 4" />
+      <path d="M20 16v4h-4" />
+      <path d="M15 15l5 5" />
+      <path d="M4 4l5 5" />
+    </>
+  ),
+  repetir: (
+    <>
+      <path d="M17 2l3 3-3 3" />
+      <path d="M4 11V9a4 4 0 0 1 4-4h12" />
+      <path d="M7 22l-3-3 3-3" />
+      <path d="M20 13v2a4 4 0 0 1-4 4H4" />
+    </>
+  ),
+  cola: (
+    <>
+      <path d="M4 6h16M4 12h10M4 18h10" />
+      <path d="M17 14l4 3-4 3z" fill="currentColor" />
+    </>
+  ),
+  volumen: (
+    <>
+      <path d="M4 9v6h4l5 4V5L8 9z" />
+      <path d="M16.5 8.5a5 5 0 0 1 0 7" />
+    </>
+  ),
+  silencio: (
+    <>
+      <path d="M4 9v6h4l5 4V5L8 9z" />
+      <path d="M17 9l4 6M21 9l-4 6" />
+    </>
+  ),
+  cerrar: <path d="M6 6l12 12M18 6L6 18" />,
+  arrastrar: (
+    <>
+      <circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

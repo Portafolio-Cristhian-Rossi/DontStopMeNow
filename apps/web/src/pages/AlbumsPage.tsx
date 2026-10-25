@@ -2,7 +2,9 @@ import { Link, useSearchParams } from 'react-router';
 import { useCatalog } from '../api/queries.ts';
 import { Cover } from '../components/Cover.tsx';
 import { LibraryTabs } from '../components/LibraryTabs.tsx';
+import { Icon } from '../components/Icon.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { usePlayerActions } from '../player/PlayerContext.tsx';
 
 /** Chips de artista que entran sin amontonarse; el resto se encuentra en la pestaña Artistas. */
 const MAX_CHIPS = 6;
@@ -13,6 +15,7 @@ export function AlbumsPage() {
   const { data, isPending, error } = useCatalog();
   const [params] = useSearchParams();
   const artist = params.get('artista');
+  const player = usePlayerActions();
 
   if (isPending) return <p className="muted">Cargando…</p>;
   if (error) return <p className="error">{error.message}</p>;
@@ -59,11 +62,24 @@ export function AlbumsPage() {
       ) : (
         <div className="album-grid">
           {albums.map((a) => (
-            <Link key={a.id} to={`/biblioteca/albumes/${a.id}`} className="album-card">
-              <Cover coverId={a.coverId} title={a.title} />
-              <div className="title">{a.title}</div>
-              <div className="muted">{[a.artist, a.year].filter(Boolean).join(' · ')}</div>
-            </Link>
+            <div key={a.id} className="album-tile">
+              <Link to={`/biblioteca/albumes/${a.id}`} className="album-card">
+                <Cover coverId={a.coverId} title={a.title} />
+                <div className="title">{a.title}</div>
+                <div className="muted">{[a.artist, a.year].filter(Boolean).join(' · ')}</div>
+              </Link>
+              {/* Va afuera del link (un botón no puede ir adentro), encima de la portada. */}
+              <div className="cover-overlay">
+                <button
+                  type="button"
+                  className="cover-play"
+                  aria-label={`Reproducir ${a.title}`}
+                  onClick={() => player.playList(a.trackIds, 0, { shuffle: false })}
+                >
+                  <Icon name="play" size={18} />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}

@@ -1,5 +1,4 @@
-import type { Catalog, LocalDownload, Selection } from '@dsmn/shared';
-import type { QueueState } from './player/queue.ts';
+import type { Catalog, LocalDownload, QueueState, Selection } from '@dsmn/shared';
 import type { PairedServer, SqlDb } from './types.ts';
 
 export type StoredDownload = LocalDownload & { path: string; size: number };

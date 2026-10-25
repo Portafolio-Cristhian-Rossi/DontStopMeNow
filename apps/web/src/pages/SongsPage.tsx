@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon.tsx';
 import { LibraryTabs } from '../components/LibraryTabs.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
+import { useCurrentTrackId, usePlayerActions } from '../player/PlayerContext.tsx';
 import { searchKey } from '@dsmn/shared';
 
 /** Más filas que esto vuelven lenta la página; se pide refinar la búsqueda. */
@@ -43,10 +44,21 @@ export function SongsPage() {
     [],
   );
 
+  const shown = useMemo(() => matches.slice(0, MAX_ROWS), [matches]);
+  const player = usePlayerActions();
+  const currentId = useCurrentTrackId();
+  // La cola es lo que se ve en la búsqueda, desde la canción elegida.
+  const play = useCallback(
+    (index: number) =>
+      player.playList(
+        shown.map((t) => t.id),
+        index,
+      ),
+    [player, shown],
+  );
+
   if (isPending) return <p className="muted">Cargando…</p>;
   if (error) return <p className="error">{error.message}</p>;
-
-  const shown = matches.slice(0, MAX_ROWS);
 
   return (
     <>
@@ -93,7 +105,15 @@ export function SongsPage() {
           Mostrando {MAX_ROWS} de {matches.length}. Refiná la búsqueda para ver el resto.
         </p>
       )}
-      <TrackTable tracks={shown} albums={albums} selectable selected={selected} onToggle={toggle} />
+      <TrackTable
+        tracks={shown}
+        albums={albums}
+        selectable
+        selected={selected}
+        onToggle={toggle}
+        onPlay={play}
+        currentId={currentId}
+      />
     </>
   );
 }

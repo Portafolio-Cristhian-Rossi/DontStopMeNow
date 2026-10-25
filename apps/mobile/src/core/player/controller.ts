@@ -12,7 +12,7 @@ import {
   setShuffle,
   type QueueState,
   type RepeatMode,
-} from './queue.ts';
+} from '@dsmn/shared';
 
 export interface PlayerSnapshot {
   queue: QueueState | null;
