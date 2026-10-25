@@ -33,11 +33,11 @@ export default function TabsLayout() {
         headerShadowVisible: false,
         headerTitleStyle: { fontFamily: fontFamilyFor('display', '800'), fontSize: 24 },
         sceneStyle: { backgroundColor: colors.bg },
-        tabBarStyle: { backgroundColor: colors.surfaceSide, borderTopColor: colors.border, height: 64 },
+        // Sin alto fijo: la barra suma sola el espacio de la barra de navegación de Android.
+        tabBarStyle: { backgroundColor: colors.surfaceSide, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontFamily: fontFamilyFor('body', '600'), fontSize: 12 },
-        tabBarItemStyle: { paddingVertical: 6 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Biblioteca', tabBarIcon: icon('disc-outline') }} />
