@@ -18,6 +18,8 @@ export const TrackSchema = z.object({
   fingerprint: z.string(),
   coverId: z.string().nullable(),
   available: z.boolean(),
+  /** Cuándo se marcó como favorita (ms), o null. Opcional: los servidores viejos no lo mandan. */
+  favoritedAt: z.number().int().nullable().optional(),
 });
 export type Track = z.infer<typeof TrackSchema>;
 

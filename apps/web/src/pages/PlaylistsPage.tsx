@@ -8,6 +8,7 @@ import { Cover } from '../components/Cover.tsx';
 import { FolderPicker } from '../components/FolderPicker.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { favoriteTracks } from './FavoritesPage.tsx';
 
 /** Hasta cuatro álbumes distintos de la lista, para armar el mosaico de la tarjeta. */
 function mosaic(playlist: Playlist, catalog: Catalog): Album[] {
@@ -53,6 +54,7 @@ export function PlaylistsPage() {
 
   // Sin listas, el formulario arranca abierto: es lo único que se puede hacer acá.
   const showForm = open ?? data.playlists.length === 0;
+  const favorites = favoriteTracks(data).length;
 
   return (
     <>
@@ -131,41 +133,53 @@ export function PlaylistsPage() {
         </section>
       )}
 
-      {data.playlists.length === 0 ? (
-        <p className="empty">Todavía no hay listas.</p>
-      ) : (
-        <ul className="list-plain playlist-grid">
-          {data.playlists.map((p) => {
-            const covers = mosaic(p, data);
-            return (
-              <li key={p.id} style={{ padding: 0 }}>
-                <Link to={`/listas/${p.id}`} className="playlist-card">
-                  {p.type === 'folder' || covers.length === 0 ? (
-                    <span className="playlist-art">
-                      <Icon name={p.type === 'folder' ? 'carpeta' : 'listas'} size={44} />
-                    </span>
-                  ) : (
-                    <span className="playlist-art mosaic">
-                      {[0, 1, 2, 3].map((i) => {
-                        const album = covers[i % covers.length]!;
-                        return <Cover key={i} coverId={album.coverId} title={album.title} />;
-                      })}
-                    </span>
-                  )}
-                  <span>
-                    <strong className="ellipsis" style={{ display: 'block' }}>
-                      {p.name}
-                    </strong>
-                    <span className="muted">
-                      {p.type === 'manual' ? 'Manual' : 'Carpeta'} · {p.trackIds.length} canciones
-                    </span>
+      <ul className="list-plain playlist-grid">
+        <li style={{ padding: 0 }}>
+          <Link to="/listas/favoritas" className="playlist-card">
+            <span className="playlist-art favorites-art">
+              <Icon name="corazon" size={56} filled />
+            </span>
+            <span>
+              <strong className="ellipsis" style={{ display: 'block' }}>
+                Favoritas
+              </strong>
+              <span className="muted">
+                Se arma sola con el corazón · {favorites} {favorites === 1 ? 'canción' : 'canciones'}
+              </span>
+            </span>
+          </Link>
+        </li>
+        {data.playlists.map((p) => {
+          const covers = mosaic(p, data);
+          return (
+            <li key={p.id} style={{ padding: 0 }}>
+              <Link to={`/listas/${p.id}`} className="playlist-card">
+                {p.type === 'folder' || covers.length === 0 ? (
+                  <span className="playlist-art">
+                    <Icon name={p.type === 'folder' ? 'carpeta' : 'listas'} size={44} />
                   </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                ) : (
+                  <span className="playlist-art mosaic">
+                    {[0, 1, 2, 3].map((i) => {
+                      const album = covers[i % covers.length]!;
+                      return <Cover key={i} coverId={album.coverId} title={album.title} />;
+                    })}
+                  </span>
+                )}
+                <span>
+                  <strong className="ellipsis" style={{ display: 'block' }}>
+                    {p.name}
+                  </strong>
+                  <span className="muted">
+                    {p.type === 'manual' ? 'Manual' : 'Carpeta'} · {p.trackIds.length} canciones
+                  </span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      {data.playlists.length === 0 && <p className="muted">Todavía no hay listas.</p>}
     </>
   );
 }

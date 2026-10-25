@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { HeartButton } from '../components/HeartButton.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Disc } from '../player/Disc.tsx';
 import { Progress, Transport, Volume } from '../player/PlayerBar.tsx';
@@ -30,6 +31,7 @@ export function NowPlayingPage() {
         <div className="stage-info">
           <h1>{track.title}</h1>
           <p className="muted">{[track.artist, album?.title].filter(Boolean).join(' · ')}</p>
+          <HeartButton track={track} size={24} />
         </div>
         <Progress snapshot={snapshot} player={player} />
         <Transport snapshot={snapshot} player={player} large />

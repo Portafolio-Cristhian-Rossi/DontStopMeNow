@@ -1,6 +1,7 @@
 import type { Album, Track } from '@dsmn/shared';
 import { memo, type ReactNode } from 'react';
 import { formatDuration } from '@dsmn/shared';
+import { HeartButton } from './HeartButton.tsx';
 import { Icon } from './Icon.tsx';
 
 interface Props {
@@ -102,6 +103,9 @@ const TrackRow = memo(function TrackRow({
         )}
       </td>
       <TitleCell track={t} playing={playing} onPlay={onPlay && (() => onPlay(index))} />
+      <td className="fav">
+        <HeartButton track={t} />
+      </td>
       <td className="secondary">{t.artist}</td>
       <td className="secondary">{albumTitle}</td>
       <td className="time">{formatDuration(t.durationMs)}</td>
@@ -127,6 +131,7 @@ export function TrackTable({
         <tr>
           <th>#</th>
           <th>Título</th>
+          <th aria-label="Favorita" />
           <th>Artista</th>
           <th>Álbum</th>
           <th style={{ textAlign: 'right' }}>Duración</th>

@@ -5,6 +5,7 @@ import { AlbumsPage } from './pages/AlbumsPage.tsx';
 import { ArtistsPage } from './pages/ArtistsPage.tsx';
 import { DevicesPage } from './pages/DevicesPage.tsx';
 import { DownloadPage } from './pages/DownloadPage.tsx';
+import { FavoritesPage } from './pages/FavoritesPage.tsx';
 import { NowPlayingPage } from './pages/NowPlayingPage.tsx';
 import { PlaylistPage } from './pages/PlaylistPage.tsx';
 import { PlaylistsPage } from './pages/PlaylistsPage.tsx';
@@ -24,6 +25,7 @@ export function App() {
           <Route path="canciones" element={<SongsPage />} />
         </Route>
         <Route path="listas" element={<PlaylistsPage />} />
+        <Route path="listas/favoritas" element={<FavoritesPage />} />
         <Route path="listas/:id" element={<PlaylistPage />} />
         <Route path="descargar" element={<DownloadPage />} />
         <Route path="ajustes" element={<SettingsPage />} />

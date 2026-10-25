@@ -22,6 +22,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { api } from '../api/client.ts';
 import { queryKeys, useCatalog, useRoots } from '../api/queries.ts';
 import { displayPath } from '../components/FolderPicker.tsx';
+import { HeartButton } from '../components/HeartButton.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { TitleCell, TrackTable } from '../components/TrackTable.tsx';
@@ -56,6 +57,9 @@ function SortableRow({ id, index, track, album, last, busy, onMove, onRemove, pl
         {index + 1}
       </td>
       <TitleCell track={track} playing={playing} onPlay={onPlay} />
+      <td className="fav">
+        <HeartButton track={track} />
+      </td>
       <td className="secondary">{track.artist}</td>
       <td className="secondary">{album?.title ?? ''}</td>
       <td className="time">{formatDuration(track.durationMs)}</td>
@@ -225,6 +229,7 @@ export function PlaylistPage() {
                 <tr>
                   <th>#</th>
                   <th>Título</th>
+                  <th aria-label="Favorita" />
                   <th>Artista</th>
                   <th>Álbum</th>
                   <th>Duración</th>

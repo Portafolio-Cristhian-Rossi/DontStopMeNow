@@ -3,6 +3,7 @@ import { DownloadProgressContext, ScanStatusContext, useServerEvents } from '../
 import { PlayerBar } from '../player/PlayerBar.tsx';
 import { PlayerProvider } from '../player/PlayerContext.tsx';
 import { Icon, type IconName } from './Icon.tsx';
+import { Toast } from './Toast.tsx';
 
 const SECTIONS: { to: string; label: string; prefix: string; icon: IconName }[] = [
   { to: '/biblioteca/albumes', label: 'Biblioteca', prefix: '/biblioteca', icon: 'biblioteca' },
@@ -54,6 +55,7 @@ export function Layout() {
               <Outlet />
             </main>
             <PlayerBar />
+            <Toast />
           </div>
         </PlayerProvider>
       </DownloadProgressContext.Provider>

@@ -1,6 +1,7 @@
 import { formatDuration, type RepeatMode } from '@dsmn/shared';
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
+import { HeartButton } from '../components/HeartButton.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Disc } from './Disc.tsx';
 import { usePlayer } from './PlayerContext.tsx';
@@ -123,6 +124,7 @@ export function PlayerBar() {
           <span className="ellipsis muted">{[track.artist, album?.title].filter(Boolean).join(' · ')}</span>
         </span>
       </Link>
+      <HeartButton track={track} />
       <div className="player-center">
         <Transport snapshot={snapshot} player={player} />
         <Progress snapshot={snapshot} player={player} />
