@@ -4,7 +4,7 @@ import { SectionList, StyleSheet, Switch, View } from 'react-native';
 import { Text } from '../../src/ui/Text.tsx';
 import { Button } from '../../src/ui/Button.tsx';
 import { colors } from '../../src/ui/theme.ts';
-import { selectionSummary, sizeLookup } from '../../src/core/library.ts';
+import { libraryView, selectionSummary, sizeLookup } from '../../src/core/library.ts';
 import { useApp, useSyncProgress } from '../../src/state/AppContext.tsx';
 
 const MAX_FAILURES_SHOWN = 5;
@@ -89,6 +89,11 @@ export default function Descargas() {
   const selectedKeys = useMemo(() => new Set(selection.map((s) => `${s.kind}:${s.id}`)), [selection]);
   const titles = useMemo(() => new Map((catalog?.tracks ?? []).map((t) => [t.id, t.title])), [catalog]);
   const onToggle = useCallback((sel: Selection) => toggle(sel), [toggle]);
+  // Lo que hay en el celular (antes estaba arriba de la Biblioteca).
+  const onPhone = useMemo(() => {
+    const view = catalog ? libraryView(catalog, downloadedIds) : null;
+    return { albums: view?.albums.length ?? 0, tracks: view?.tracks.length ?? 0 };
+  }, [catalog, downloadedIds]);
 
   if (!catalog || !summary) {
     return (
@@ -113,7 +118,10 @@ export default function Descargas() {
         Seleccionado: {summary.trackCount} canciones · {formatBytes(summary.bytes)} · Libre:{' '}
         {formatBytes(freeBytes())}
       </Text>
-      <Text style={styles.muted}>{downloadedIds.size} canciones en el celular</Text>
+      <Text style={styles.muted}>
+        En el celular: {onPhone.albums} {onPhone.albums === 1 ? 'álbum' : 'álbumes'} · {onPhone.tracks}{' '}
+        {onPhone.tracks === 1 ? 'canción' : 'canciones'} · se escuchan sin conexión
+      </Text>
       {sync.running ? (
         <Button title="Detener" onPress={stopSync} />
       ) : (

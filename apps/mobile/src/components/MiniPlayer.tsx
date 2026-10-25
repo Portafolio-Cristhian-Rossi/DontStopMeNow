@@ -1,15 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../state/AppContext.tsx';
 import { usePlayer, usePlayerSnapshot } from '../state/PlayerContext.tsx';
 import { Text } from '../ui/Text.tsx';
 import { colors, TOUCH } from '../ui/theme.ts';
 import { Disc } from './Disc.tsx';
 
-/** Barra con la canción actual sobre las pestañas; tocarla abre el reproductor. */
-export function MiniPlayer() {
+/**
+ * Barra con la canción actual; tocarla abre el reproductor. Sobre las pestañas va pegada a la barra de
+ * pestañas; `standalone` (en Álbum o Lista, sin pestañas) deja libre la barra de navegación de Android.
+ */
+export function MiniPlayer({ standalone = false }: { standalone?: boolean }) {
   const player = usePlayer();
+  const insets = useSafeAreaInsets();
   const { catalog } = useApp();
   const { current, playing, positionMs, durationMs } = usePlayerSnapshot();
   if (!current) return null;
@@ -17,7 +22,10 @@ export function MiniPlayer() {
   const album = catalog?.albums.find((a) => a.id === current.albumId);
 
   return (
-    <View style={styles.wrap} accessibilityLabel="Reproductor">
+    <View
+      style={[styles.wrap, standalone && { marginBottom: insets.bottom + 8 }]}
+      accessibilityLabel="Reproductor"
+    >
       <Pressable
         style={styles.row}
         onPress={() => router.push('/reproductor')}

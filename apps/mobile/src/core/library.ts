@@ -1,10 +1,15 @@
 import type { Album, Catalog, Playlist, Selection, Track } from '@dsmn/shared';
 
+/** Id de la lista especial Favoritas en la app (no choca con los de las listas, que son UUID). */
+export const FAVORITES_ID = 'favoritas';
+
 export interface LibraryView {
   albums: Album[];
   artists: { name: string; albumIds: string[] }[];
   playlists: Playlist[];
   tracks: Track[];
+  /** Favoritas descargadas, la última marcada primero (una vez por huella aunque haya copias). */
+  favorites: Track[];
 }
 
 /** La biblioteca que se puede escuchar sin conexión: solo lo que ya está descargado. */
@@ -23,7 +28,14 @@ export function libraryView(catalog: Catalog, downloadedIds: Set<string>): Libra
     .map(([name, albumIds]) => ({ name, albumIds }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es'));
 
-  return { albums, artists, playlists, tracks: catalog.tracks.filter((t) => downloadedIds.has(t.id)) };
+  const tracks = catalog.tracks.filter((t) => downloadedIds.has(t.id));
+  const seen = new Set<string>();
+  const favorites = tracks
+    .filter((t) => t.favoritedAt)
+    .sort((a, b) => b.favoritedAt! - a.favoritedAt!)
+    .filter((t) => !seen.has(t.fingerprint) && seen.add(t.fingerprint));
+
+  return { albums, artists, playlists, tracks, favorites };
 }
 
 function selectedTrackIds(catalog: Catalog, selection: Selection[]): Set<string> {

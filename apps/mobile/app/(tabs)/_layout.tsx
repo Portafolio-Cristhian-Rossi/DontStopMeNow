@@ -40,8 +40,14 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontFamily: fontFamilyFor('body', '600'), fontSize: 12 },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Biblioteca', tabBarIcon: icon('disc-outline') }} />
-      <Tabs.Screen name="listas" options={{ title: 'Listas', tabBarIcon: icon('list') }} />
+      <Tabs.Screen
+        name="index"
+        options={{ title: 'Biblioteca', headerShown: false, tabBarIcon: icon('disc-outline') }}
+      />
+      <Tabs.Screen
+        name="listas"
+        options={{ title: 'Listas', headerShown: false, tabBarIcon: icon('list') }}
+      />
       <Tabs.Screen
         name="descargas"
         options={{ title: 'Descargas', tabBarIcon: icon('cloud-download-outline') }}
