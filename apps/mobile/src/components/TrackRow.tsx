@@ -1,5 +1,7 @@
 import { formatDuration, type Track } from '@dsmn/shared';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text.tsx';
+import { colors } from '../ui/theme.ts';
 import { useCurrentTrackId, usePlayer } from '../state/PlayerContext.tsx';
 
 interface Props {
@@ -45,8 +47,8 @@ export function TrackRow({ track, index, onPress }: Props) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
-  index: { width: 24, opacity: 0.5, textAlign: 'right' },
+  index: { width: 24, color: colors.faint, textAlign: 'right' },
   title: { fontSize: 16 },
-  active: { color: '#e2483d', fontWeight: '700' },
-  muted: { opacity: 0.6 },
+  active: { color: colors.accent, fontWeight: '700' },
+  muted: { color: colors.muted },
 });

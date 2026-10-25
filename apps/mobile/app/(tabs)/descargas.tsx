@@ -1,6 +1,9 @@
 import { formatBytes, type Catalog, type Selection } from '@dsmn/shared';
 import { memo, useCallback, useMemo } from 'react';
-import { Button, SectionList, StyleSheet, Switch, Text, View } from 'react-native';
+import { SectionList, StyleSheet, Switch, View } from 'react-native';
+import { Text } from '../../src/ui/Text.tsx';
+import { Button } from '../../src/ui/Button.tsx';
+import { colors } from '../../src/ui/theme.ts';
 import { selectionSummary, sizeLookup } from '../../src/core/library.ts';
 import { useApp, useSyncProgress } from '../../src/state/AppContext.tsx';
 
@@ -159,10 +162,10 @@ export default function Descargas() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  header: { padding: 16, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#8886' },
+  header: { padding: 16, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   section: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, fontWeight: '700', fontSize: 15 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
   title: { fontSize: 16 },
-  muted: { opacity: 0.6 },
-  error: { color: '#d33' },
+  muted: { color: colors.muted },
+  error: { color: colors.danger },
 });

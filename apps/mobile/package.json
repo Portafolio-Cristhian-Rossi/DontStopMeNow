@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@dsmn/shared": "*",
+    "@expo-google-fonts/bricolage-grotesque": "^0.4.1",
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
     "@noble/hashes": "^2.4.0",
     "@react-native-community/slider": "5.2.1",
@@ -21,6 +24,7 @@
     "expo-dev-client": "~58.0.15",
     "expo-device": "~58.0.5",
     "expo-file-system": "~58.0.10",
+    "expo-font": "~58.0.10",
     "expo-keep-awake": "~58.0.3",
     "expo-linking": "~58.0.14",
     "expo-router": "~58.0.25",

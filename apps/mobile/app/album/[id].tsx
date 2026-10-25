@@ -1,6 +1,8 @@
 import { formatDuration } from '@dsmn/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/Text.tsx';
+import { colors } from '../../src/ui/theme.ts';
 import { Cover } from '../../src/components/Cover.tsx';
 import { MiniPlayer } from '../../src/components/MiniPlayer.tsx';
 import { PlayButtons } from '../../src/components/PlayButtons.tsx';
@@ -60,8 +62,8 @@ export default function AlbumScreen() {
 }
 
 const styles = StyleSheet.create({
-  empty: { padding: 24, opacity: 0.6 },
+  empty: { padding: 24, color: colors.muted },
   header: { flexDirection: 'row', gap: 16, padding: 16, alignItems: 'flex-end' },
   title: { fontSize: 22, fontWeight: '700' },
-  muted: { opacity: 0.6 },
+  muted: { color: colors.muted },
 });

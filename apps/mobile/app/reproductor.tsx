@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDuration } from '@dsmn/shared';
 import Slider from '@react-native-community/slider';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../src/ui/Text.tsx';
+import { colors } from '../src/ui/theme.ts';
 import { Cover } from '../src/components/Cover.tsx';
 import { useApp } from '../src/state/AppContext.tsx';
 import { usePlayer, usePlayerSnapshot } from '../src/state/PlayerContext.tsx';
@@ -60,27 +62,31 @@ export default function Reproductor() {
               accessibilityLabel="Aleatorio"
               hitSlop={8}
             >
-              <Ionicons name="shuffle" size={26} color={queue.shuffle ? '#e2483d' : '#888'} />
+              <Ionicons name="shuffle" size={26} color={queue.shuffle ? colors.accent : colors.muted} />
             </Pressable>
             <Pressable onPress={() => player.previous()} accessibilityLabel="Anterior" hitSlop={8}>
-              <Ionicons name="play-skip-back" size={34} color="#888" />
+              <Ionicons name="play-skip-back" size={34} color={colors.muted} />
             </Pressable>
             <Pressable
               onPress={() => player.toggle()}
               accessibilityLabel={playing ? 'Pausar' : 'Reproducir'}
               hitSlop={8}
             >
-              <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={72} color="#e2483d" />
+              <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={72} color={colors.accent} />
             </Pressable>
             <Pressable onPress={() => player.next()} accessibilityLabel="Siguiente" hitSlop={8}>
-              <Ionicons name="play-skip-forward" size={34} color="#888" />
+              <Ionicons name="play-skip-forward" size={34} color={colors.muted} />
             </Pressable>
             <Pressable
               onPress={() => player.cycleRepeat()}
               accessibilityLabel={REPEAT_LABEL[queue.repeat]}
               hitSlop={8}
             >
-              <Ionicons name="repeat" size={26} color={queue.repeat === 'off' ? '#888' : '#e2483d'} />
+              <Ionicons
+                name="repeat"
+                size={26}
+                color={queue.repeat === 'off' ? colors.muted : colors.accent}
+              />
               {queue.repeat === 'one' && <Text style={styles.badge}>1</Text>}
             </Pressable>
           </View>
@@ -111,7 +117,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   header: { alignItems: 'center', padding: 24, gap: 8 },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 12 },
-  muted: { opacity: 0.6 },
+  muted: { color: colors.muted },
   times: { flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch' },
   controls: {
     flexDirection: 'row',
@@ -119,9 +125,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignSelf: 'stretch',
   },
-  badge: { position: 'absolute', right: -4, top: -4, fontSize: 10, color: '#e2483d', fontWeight: '700' },
+  badge: { position: 'absolute', right: -4, top: -4, fontSize: 10, color: colors.accent, fontWeight: '700' },
   section: { alignSelf: 'flex-start', fontSize: 17, fontWeight: '600', marginTop: 16 },
   queueRow: { paddingHorizontal: 24, paddingVertical: 8 },
   queueTitle: { fontSize: 15 },
-  active: { color: '#e2483d', fontWeight: '700' },
+  active: { color: colors.accent, fontWeight: '700' },
 });

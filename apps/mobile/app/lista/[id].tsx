@@ -1,5 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
+import { Text } from '../../src/ui/Text.tsx';
+import { colors } from '../../src/ui/theme.ts';
 import { MiniPlayer } from '../../src/components/MiniPlayer.tsx';
 import { PlayButtons } from '../../src/components/PlayButtons.tsx';
 import { TrackRow } from '../../src/components/TrackRow.tsx';
@@ -14,7 +16,8 @@ export default function PlaylistScreen() {
   const playlist = catalog
     ? libraryView(catalog, downloadedIds).playlists.find((p) => p.id === id)
     : undefined;
-  if (!catalog || !playlist) return <Text style={{ padding: 24, opacity: 0.6 }}>Lista no encontrada</Text>;
+  if (!catalog || !playlist)
+    return <Text style={{ padding: 24, color: colors.muted }}>Lista no encontrada</Text>;
 
   const byId = new Map(catalog.tracks.map((t) => [t.id, t]));
   const tracks = playlist.trackIds.flatMap((tid) => byId.get(tid) ?? []);

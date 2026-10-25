@@ -1,8 +1,13 @@
+import { coverColors, initials } from '@dsmn/shared';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { useApp } from '../state/AppContext.tsx';
+import { Text } from '../ui/Text.tsx';
 
-/** Portada guardada en el celular; si no está (o no carga), la inicial del título. */
+/**
+ * Portada guardada en el celular; si no está (o no carga), las iniciales sobre un color que sale del
+ * título (el mismo que muestra la web).
+ */
 export function Cover({
   coverId,
   title,
@@ -15,19 +20,20 @@ export function Cover({
   const { coverUri } = useApp();
   const [failed, setFailed] = useState(false);
   const uri = coverUri(coverId);
-  const box = { width: size, height: size, borderRadius: size / 8 };
+  const box = { width: size, height: size, borderRadius: Math.max(6, size / 7) };
   if (uri && !failed) {
     return <Image style={[styles.base, box]} source={{ uri }} onError={() => setFailed(true)} />;
   }
+  const { background, color } = coverColors(title);
   return (
-    <View style={[styles.base, box]}>
-      <Text style={{ fontSize: size / 2.5, fontWeight: '700', opacity: 0.5 }}>
-        {title.trim().charAt(0).toUpperCase()}
+    <View style={[styles.base, box, { backgroundColor: background }]}>
+      <Text font="display" style={{ color, fontSize: size / 2.8, fontWeight: '800' }}>
+        {initials(title)}
       </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { backgroundColor: '#8883', alignItems: 'center', justifyContent: 'center' },
+  base: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
 });

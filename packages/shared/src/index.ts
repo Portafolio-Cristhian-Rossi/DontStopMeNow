@@ -7,3 +7,4 @@ export * from './fingerprint.ts';
 export * from './format.ts';
 export * from './search.ts';
 export * from './queue.ts';
+export * from './covers.ts';

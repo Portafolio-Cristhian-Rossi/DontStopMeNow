@@ -1,6 +1,9 @@
 import { formatBytes } from '@dsmn/shared';
 import { router } from 'expo-router';
-import { Alert, Button, ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '../../src/ui/Text.tsx';
+import { Button } from '../../src/ui/Button.tsx';
+import { colors } from '../../src/ui/theme.ts';
 import { useApp } from '../../src/state/AppContext.tsx';
 
 export default function Ajustes() {
@@ -47,7 +50,7 @@ export default function Ajustes() {
       </Text>
       <Button
         title="Borrar todo lo descargado"
-        color="#c33"
+        variant="danger"
         disabled={downloads.length === 0}
         onPress={confirmDelete}
       />
@@ -58,5 +61,5 @@ export default function Ajustes() {
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 8 },
   section: { fontSize: 17, fontWeight: '600', marginTop: 16 },
-  muted: { opacity: 0.6 },
+  muted: { color: colors.muted },
 });

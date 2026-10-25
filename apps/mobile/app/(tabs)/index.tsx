@@ -1,18 +1,20 @@
 import { searchKey } from '@dsmn/shared';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Cover } from '../../src/components/Cover.tsx';
 import { TrackRow } from '../../src/components/TrackRow.tsx';
 import { libraryView } from '../../src/core/library.ts';
 import { useApp } from '../../src/state/AppContext.tsx';
 import { usePlayer } from '../../src/state/PlayerContext.tsx';
+import { Text } from '../../src/ui/Text.tsx';
+import { TextInput } from '../../src/ui/TextInput.tsx';
+import { colors } from '../../src/ui/theme.ts';
 
-type Tab = 'albumes' | 'artistas' | 'listas' | 'canciones';
+type Tab = 'albumes' | 'artistas' | 'canciones';
 const TABS: [Tab, string][] = [
   ['albumes', 'Álbumes'],
   ['artistas', 'Artistas'],
-  ['listas', 'Listas'],
   ['canciones', 'Canciones'],
 ];
 
@@ -51,12 +53,20 @@ export default function Biblioteca() {
               setArtist(null);
             }}
             style={[styles.tab, tab === key && styles.tabActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === key }}
           >
-            <Text style={tab === key ? styles.tabTextActive : undefined}>{label}</Text>
+            <Text style={tab === key ? styles.tabTextActive : styles.tabText}>{label}</Text>
           </Pressable>
         ))}
       </View>
-      <TextInput style={styles.search} placeholder="Buscar" value={query} onChangeText={setQuery} />
+      <TextInput
+        style={styles.search}
+        placeholder="Buscar en lo descargado"
+        value={query}
+        onChangeText={setQuery}
+        accessibilityLabel="Buscar en lo descargado"
+      />
       {artist && (
         <Pressable onPress={() => setArtist(null)}>
           <Text style={styles.filter}>{artist} · ver todos</Text>
@@ -102,20 +112,6 @@ export default function Biblioteca() {
           )}
         />
       )}
-      {tab === 'listas' && (
-        <FlatList
-          data={view.playlists.filter((p) => matches(p.name))}
-          keyExtractor={(p) => p.id}
-          renderItem={({ item }) => (
-            <Link href={{ pathname: '/lista/[id]', params: { id: item.id } }} asChild>
-              <Pressable style={styles.row}>
-                <Text style={styles.title}>{item.name}</Text>
-                <Text style={styles.muted}>{item.trackIds.length} canciones</Text>
-              </Pressable>
-            </Link>
-          )}
-        />
-      )}
       {tab === 'canciones' && (
         <FlatList
           data={songs}
@@ -140,20 +136,21 @@ export default function Biblioteca() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  tabs: { flexDirection: 'row', padding: 8, gap: 4 },
-  tab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  tabActive: { backgroundColor: '#8883' },
-  tabTextActive: { fontWeight: '700' },
-  search: {
+  tabs: {
+    flexDirection: 'row',
+    gap: 24,
     marginHorizontal: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#8884',
-    borderRadius: 8,
-    padding: 8,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
   },
-  filter: { paddingHorizontal: 16, paddingBottom: 8, opacity: 0.7 },
+  tab: { minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, borderColor: 'transparent' },
+  tabActive: { borderColor: colors.accent },
+  tabText: { color: colors.muted, fontWeight: '500' },
+  tabTextActive: { fontWeight: '600' },
+  search: { marginHorizontal: 16, marginBottom: 8 },
+  filter: { paddingHorizontal: 16, paddingBottom: 8, color: colors.textSoft },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
-  title: { fontSize: 16, flexShrink: 1 },
-  muted: { opacity: 0.6 },
+  title: { fontSize: 16, fontWeight: '600', flexShrink: 1 },
+  muted: { color: colors.muted },
 });
