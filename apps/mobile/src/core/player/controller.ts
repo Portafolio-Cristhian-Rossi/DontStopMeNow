@@ -331,6 +331,21 @@ export class PlayerController {
     this.refresh();
   }
 
+  /**
+   * Tras mover lo descargado a otra carpeta: la cola apunta a los archivos nuevos de esas canciones. La que
+   * suena no se toca (no se mueve mientras suena), así que no se corta.
+   */
+  replaceSources(trackIds: Set<string>): void {
+    const q = this.queue;
+    if (!q) return;
+    q.order.forEach((id, i) => {
+      const path = this.deps.downloadPath(id);
+      if (i === q.index || !path || !trackIds.has(id)) return;
+      this.deps.engine.remove(i);
+      this.deps.engine.insert({ uri: path }, i);
+    });
+  }
+
   /** Lo llama la capa de React cada 10 s mientras suena. */
   tick(): void {
     if (this.deps.engine.status().playing) this.persist();

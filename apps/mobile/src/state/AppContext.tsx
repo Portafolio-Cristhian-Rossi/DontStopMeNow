@@ -13,30 +13,52 @@ import {
 import { AppState } from 'react-native';
 import { resolveServerUrl } from '../core/discovery.ts';
 import { ServerUnreachableError, UnauthorizedError, createServerClient } from '../core/http.ts';
+import { relocateDownloads, type RelocateReport } from '../core/relocate.ts';
 import { LocalStore, type StoredDownload } from '../core/store.ts';
 import {
   InsufficientSpaceError,
+  TargetWriteError,
   coverPath,
   runSync,
   type SyncProgress,
   type SyncReport,
 } from '../core/syncEngine.ts';
 import type { Discovery, FetchLike, FileStore, PairedServer } from '../core/types.ts';
-import { createDiscovery, createDownloader, createFileStore, openSqlDb } from '../native/index.ts';
+import {
+  createDiscovery,
+  createDownloader,
+  createFileStore,
+  openSqlDb,
+  pickFolder,
+} from '../native/index.ts';
 
 const appFetch = fetch as unknown as FetchLike;
 /** El progreso se publica como mucho cada 250 ms para no re-renderizar de más. */
 const PROGRESS_THROTTLE_MS = 250;
 const KEEP_AWAKE_TAG = 'dsmn-sync';
+/** Ajuste guardado: dirección de la carpeta elegida para la música; sin él, la memoria del celular. */
+const MUSIC_FOLDER = 'musicFolder';
 
 export interface SyncState {
   running: boolean;
   report: SyncReport | null;
   error: string | null;
+  /** El servidor rechazó el token: hay que volver a vincular. */
+  revoked?: boolean;
+}
+
+export interface RelocateState {
+  running: boolean;
+  done: number;
+  total: number;
+  report: RelocateReport | null;
 }
 
 export interface AppValue {
   server: PairedServer | null;
+  /** Carpeta elegida donde se guarda la música nueva (por ejemplo en la SD); null = memoria del celular. */
+  musicFolder: string | null;
+  relocation: RelocateState;
   catalog: Catalog | null;
   downloads: StoredDownload[];
   downloadedIds: Set<string>;
@@ -49,7 +71,8 @@ export interface AppValue {
   files: FileStore;
   /** El reproductor registra acá cómo saber qué canción suena (no se borra al sincronizar). */
   setPlayingTrackProvider(fn: () => string | null): void;
-  freeBytes(): number;
+  /** Espacio libre del destino; null si es una carpeta elegida (Android no lo informa). */
+  freeBytes(): number | null;
   /** URI local de una portada, o null si no está en el celular. */
   coverUri(coverId: string | null): string | null;
   pair(server: PairedServer): Promise<void>;
@@ -58,6 +81,13 @@ export interface AppValue {
   startSync(): Promise<void>;
   stopSync(): void;
   deleteAllDownloads(): Promise<void>;
+  /** Abre el selector de carpetas; devuelve false si se canceló. */
+  pickMusicFolder(): Promise<boolean>;
+  storeInternally(): void;
+  /** Lleva lo ya descargado al destino actual. */
+  relocate(): Promise<void>;
+  /** Cuántas canciones bajadas no están en el destino actual (se pueden mover). */
+  outsideTarget(): number;
 }
 
 const AppContext = createContext<AppValue | null>(null);
@@ -75,21 +105,23 @@ export const useSyncProgress = () => useContext(ProgressContext);
 function syncErrorMessage(err: unknown): string {
   if (err instanceof UnauthorizedError) return 'El servidor revocó este celular. Volvé a vincularlo.';
   if (err instanceof ServerUnreachableError) return new ServerUnreachableError().message;
+  if (err instanceof TargetWriteError)
+    return 'No se pudo guardar en la carpeta elegida (¿se llenó o se sacó la tarjeta?). Elegila de nuevo o volvé a la memoria del celular.';
   if (err instanceof InsufficientSpaceError)
     return `Faltan ${formatBytes(err.missingBytes)} de espacio libre.`;
   return err instanceof Error ? err.message : String(err);
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const deps = useMemo(
-    () => ({
-      store: new LocalStore(openSqlDb()),
-      files: createFileStore(),
+  const deps = useMemo(() => {
+    const store = new LocalStore(openSqlDb());
+    return {
+      store,
+      files: createFileStore(() => store.getSetting(MUSIC_FOLDER)),
       downloader: createDownloader(),
       discovery: createDiscovery(),
-    }),
-    [],
-  );
+    };
+  }, []);
   const { store, files } = deps;
 
   const read = useCallback(
@@ -98,6 +130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       catalog: store.getCatalog()?.catalog ?? null,
       downloads: store.getDownloads(),
       selection: store.getSelection(),
+      musicFolder: store.getSetting(MUSIC_FOLDER),
     }),
     [store],
   );
@@ -111,10 +144,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const controller = useRef<AbortController | null>(null);
   const playingTrack = useRef<() => string | null>(() => null);
   const running = useRef<Promise<void> | null>(null);
+  const [relocation, setRelocation] = useState<RelocateState>({
+    running: false,
+    done: 0,
+    total: 0,
+    report: null,
+  });
+  const relocating = useRef(false);
 
   const startSync = useCallback((): Promise<void> => {
     const server = store.getServer();
-    if (!server) return Promise.resolve();
+    if (!server || relocating.current) return Promise.resolve();
     if (running.current) return running.current;
     const abort = new AbortController();
     controller.current = abort;
@@ -146,7 +186,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSync({ running: false, report, error: null });
       } catch (err) {
         if (err instanceof ServerUnreachableError) setOnline(false);
-        setSync({ running: false, report: null, error: syncErrorMessage(err) });
+        setSync({
+          running: false,
+          report: null,
+          error: syncErrorMessage(err),
+          revoked: err instanceof UnauthorizedError,
+        });
       } finally {
         controller.current = null;
         running.current = null;
@@ -174,12 +219,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, []);
 
-  // Mientras sincroniza, la pantalla no se apaga (apagarla manda la app a segundo plano y pausa).
+  // Mientras sincroniza o mueve la música, la pantalla no se apaga (apagarla manda la app a segundo plano).
+  const busy = sync.running || relocation.running;
   useEffect(() => {
-    if (!sync.running) return;
+    if (!busy) return;
     void activateKeepAwakeAsync(KEEP_AWAKE_TAG);
     return () => void deactivateKeepAwake(KEEP_AWAKE_TAG);
-  }, [sync.running]);
+  }, [busy]);
 
   // Al abrir la app con un servidor vinculado, se sincroniza una vez.
   const started = useRef(false);
@@ -195,6 +241,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       downloadedIds,
       sync,
       online,
+      relocation,
       discovery: deps.discovery,
       store,
       files,
@@ -236,12 +283,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         reload();
       },
+      async pickMusicFolder() {
+        const uri = await pickFolder();
+        if (!uri) return false;
+        store.setSetting(MUSIC_FOLDER, uri);
+        reload();
+        return true;
+      },
+      storeInternally() {
+        store.setSetting(MUSIC_FOLDER, null);
+        reload();
+      },
+      outsideTarget: () => local.downloads.filter((d) => !files.isInTarget(d.path)).length,
+      async relocate() {
+        if (relocating.current) return;
+        relocating.current = true;
+        try {
+          await stopAndWait();
+          setRelocation({ running: true, done: 0, total: 0, report: null });
+          let lastEmit = 0;
+          const report = await relocateDownloads({
+            store,
+            files,
+            catalog: store.getCatalog()?.catalog ?? null,
+            protectedTrackIds: new Set([playingTrack.current()].filter((id): id is string => id !== null)),
+            onProgress: (done, total) => {
+              const now = Date.now();
+              if (done < total && now - lastEmit < PROGRESS_THROTTLE_MS) return;
+              lastEmit = now;
+              setRelocation({ running: true, done, total, report: null });
+            },
+          });
+          setRelocation({ running: false, done: 0, total: 0, report });
+        } finally {
+          relocating.current = false;
+          reload();
+        }
+      },
     }),
     [
       local,
       downloadedIds,
       sync,
       online,
+      relocation,
       deps.discovery,
       files,
       store,

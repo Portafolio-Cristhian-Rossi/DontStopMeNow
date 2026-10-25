@@ -50,7 +50,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="descargas"
-        options={{ title: 'Descargas', tabBarIcon: icon('cloud-download-outline') }}
+        options={{ title: 'Descargas', headerShown: false, tabBarIcon: icon('cloud-download-outline') }}
       />
       <Tabs.Screen name="ajustes" options={{ title: 'Ajustes', tabBarIcon: icon('options-outline') }} />
     </Tabs>

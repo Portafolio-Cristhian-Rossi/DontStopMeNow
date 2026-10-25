@@ -2,7 +2,7 @@ import type { Catalog } from '@dsmn/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { ServerUnreachableError, UnauthorizedError, type ServerClient } from '../src/core/http.ts';
 import { LocalStore } from '../src/core/store.ts';
-import { InsufficientSpaceError, coverPath, runSync } from '../src/core/syncEngine.ts';
+import { InsufficientSpaceError, TargetWriteError, coverPath, runSync } from '../src/core/syncEngine.ts';
 import { fakeDownloader, memoryFiles, sqliteDb, trackFor, type Behavior } from './helpers.ts';
 
 const bytes = (n: number, seed: number) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) % 251);
@@ -243,5 +243,59 @@ describe('runSync', () => {
     s.store.setSelected({ kind: 'album', id: 'al1' }, true);
     await s.run();
     expect([...s.files.files.keys()].filter((k) => k.startsWith('/covers/'))).toEqual([]);
+  });
+});
+
+describe('runSync con una carpeta elegida (la SD)', () => {
+  it('deja las canciones con nombre legible en la carpeta y borra los temporales', async () => {
+    const s = setup();
+    s.files.folder = true;
+    s.catalog.tracks[0]!.title = 'Bohemian Rhapsody';
+    s.catalog.tracks[0]!.artist = 'Queen';
+    s.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    expect(await s.run()).toMatchObject({ downloaded: 2, failed: [] });
+    expect(s.store.getDownloads().map((d) => d.path)).toEqual([
+      '/sd/Bohemian Rhapsody - Queen.mp3',
+      '/sd/t2 - Artista.mp3',
+    ]);
+    expect(s.files.list('/music')).toEqual([]);
+  });
+
+  it('dos canciones con el mismo nombre no se pisan', async () => {
+    const s = setup();
+    s.files.folder = true;
+    for (const t of s.catalog.tracks) t.title = 'Intro';
+    s.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    await s.run();
+    const paths = s.store.getDownloads().map((d) => d.path);
+    expect(paths.sort()).toEqual(['/sd/Intro - Artista (1).mp3', '/sd/Intro - Artista.mp3']);
+    expect(paths.every((p) => s.files.exists(p))).toBe(true);
+  });
+
+  it('sin saber el espacio de la carpeta, solo exige que entre la canción más grande', async () => {
+    const roomy = setup({ free: 200 * 1024 * 1024 + 300_000 });
+    roomy.files.folder = true;
+    roomy.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    expect(await roomy.run()).toMatchObject({ downloaded: 2 });
+
+    const tight = setup({ free: 200 * 1024 * 1024 + 1000 });
+    tight.files.folder = true;
+    tight.store.setSelected({ kind: 'album', id: 'al1' }, true);
+    const err = await tight.run().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(InsufficientSpaceError);
+    expect((err as InsufficientSpaceError).missingBytes).toBe(300_000 - 1000);
+  });
+
+  it('si no se puede guardar en la carpeta, frena con un aviso claro y no deja temporales', async () => {
+    const s = setup();
+    s.files.folder = true;
+    s.files.place = async () => {
+      throw new Error('Se llenó la tarjeta');
+    };
+    s.store.setSelected({ kind: 'playlist', id: 'p1' }, true);
+    await expect(s.run()).rejects.toBeInstanceOf(TargetWriteError);
+    expect(s.sleep).not.toHaveBeenCalled();
+    expect(s.store.getDownloads()).toEqual([]);
+    expect(s.files.list('/music')).toEqual([]);
   });
 });

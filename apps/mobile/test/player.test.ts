@@ -436,3 +436,27 @@ describe('PlayerController: velocidad, temporizador y cola', () => {
     expect(engine.calls).toEqual([]);
   });
 });
+
+describe('PlayerController: lo descargado se movió de carpeta', () => {
+  it('cambia los archivos de la cola sin tocar la canción que suena', () => {
+    const s = setup();
+    const paths = new Map(['t1', 't2', 't3'].map((id) => [id, `/music/${id}.mp3`]));
+    const controller = new PlayerController({
+      engine: s.engine,
+      store: s.store,
+      files: s.files,
+      catalog: () => null,
+      downloadPath: (id) => paths.get(id) ?? null,
+    });
+    controller.playList(['t1', 't2', 't3'], 1);
+    s.engine.calls.length = 0;
+    for (const id of ['t1', 't2', 't3']) paths.set(id, `/sd/${id}.mp3`);
+    controller.replaceSources(new Set(['t1', 't2', 't3']));
+    expect(s.engine.calls).toEqual([
+      ['remove', 0],
+      ['insert', '/sd/t1.mp3', 0],
+      ['remove', 2],
+      ['insert', '/sd/t3.mp3', 2],
+    ]);
+  });
+});

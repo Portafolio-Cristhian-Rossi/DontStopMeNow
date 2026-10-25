@@ -15,6 +15,16 @@ export class InsufficientSpaceError extends Error {
 }
 
 /** La huella no coincidió ni con una descarga completa nueva: no tiene sentido reintentar. */
+/**
+ * No se pudo guardar una canción ya bajada en su destino (la carpeta elegida se llenó, se sacó la tarjeta o
+ * Android quitó el permiso). Corta la sincronización: con las demás canciones pasaría lo mismo.
+ */
+export class TargetWriteError extends Error {
+  constructor() {
+    super('No se pudo guardar la música en la carpeta elegida');
+  }
+}
+
 class FingerprintMismatchError extends Error {
   constructor() {
     super('La huella no coincide');
@@ -48,7 +58,10 @@ export interface SyncDeps {
   onProgress?: (p: SyncProgress) => void;
 }
 
-const isFatal = (err: unknown) => err instanceof UnauthorizedError || err instanceof ServerUnreachableError;
+const isFatal = (err: unknown) =>
+  err instanceof UnauthorizedError ||
+  err instanceof ServerUnreachableError ||
+  err instanceof TargetWriteError;
 
 /** Mensaje en español para una canción que no se pudo bajar. */
 export function describeDownloadError(err: unknown): string {
@@ -106,8 +119,16 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
 
   // 3. Espacio.
   const bytesTotal = plan.download.reduce((sum, t) => sum + t.size, 0);
-  const available = files.freeBytes() - FREE_SPACE_MARGIN;
-  if (bytesTotal > available) throw new InsufficientSpaceError(bytesTotal - available);
+  const targetFree = files.freeBytes();
+  if (targetFree !== null) {
+    const available = targetFree - FREE_SPACE_MARGIN;
+    if (bytesTotal > available) throw new InsufficientSpaceError(bytesTotal - available);
+  } else {
+    // Carpeta elegida (SD): no se sabe su espacio; al menos tiene que entrar el temporal más grande.
+    const largest = plan.download.reduce((max, t) => Math.max(max, t.size), 0);
+    const available = files.tempFreeBytes() - FREE_SPACE_MARGIN;
+    if (largest > available) throw new InsufficientSpaceError(largest - available);
+  }
 
   // Detener (o desvincular) antes de llegar acá no debe borrar nada.
   if (signal.aborted) return { ...report, paused: true };
@@ -151,7 +172,6 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
   /** Baja, verifica y registra una canción. Devuelve false si quedó en pausa. */
   async function fetchTrack(track: Track): Promise<boolean> {
     const part = `${files.musicDir}/${track.id}.part`;
-    const final = `${files.musicDir}/${track.id}.${track.format}`;
     const partial = store.getPartial(track.id);
     let resumeState = partial?.fingerprint === track.fingerprint ? partial.state : undefined;
     if (partial && !resumeState) store.removePartial(track.id);
@@ -165,7 +185,13 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
       }
       store.removePartial(track.id);
       if ((await fingerprintOf(files, part)) === track.fingerprint) {
-        files.move(part, final);
+        let final: string;
+        try {
+          final = await files.place(part, track);
+        } catch {
+          files.remove(part);
+          throw new TargetWriteError();
+        }
         store.addDownload({
           trackId: track.id,
           fingerprint: track.fingerprint,

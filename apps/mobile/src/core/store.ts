@@ -37,6 +37,9 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS failures (
     track_id TEXT PRIMARY KEY, error TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL
+  );
 `;
 
 /** Todo lo que el celular guarda: servidor vinculado, catálogo, selección y descargas. */
@@ -137,6 +140,19 @@ export class LocalStore {
       d.path,
       d.size,
     );
+  }
+
+  updateDownloadPath(trackId: string, path: string): void {
+    this.db.run('UPDATE downloads SET path = ? WHERE track_id = ?', path, trackId);
+  }
+
+  getSetting(key: string): string | null {
+    return this.db.first<{ value: string }>('SELECT value FROM settings WHERE key = ?', key)?.value ?? null;
+  }
+
+  setSetting(key: string, value: string | null): void {
+    if (value === null) this.db.run('DELETE FROM settings WHERE key = ?', key);
+    else this.db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', key, value);
   }
 
   removeDownload(trackId: string): void {

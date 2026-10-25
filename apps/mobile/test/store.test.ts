@@ -90,4 +90,16 @@ describe('LocalStore', () => {
     store.setPlayerState(null);
     expect(store.getPlayerState()).toBeNull();
   });
+
+  it('ajustes y ruta nueva de una descarga', () => {
+    const store = new LocalStore(sqliteDb());
+    expect(store.getSetting('musicFolder')).toBeNull();
+    store.setSetting('musicFolder', 'content://sd/carpeta');
+    expect(store.getSetting('musicFolder')).toBe('content://sd/carpeta');
+    store.setSetting('musicFolder', null);
+    expect(store.getSetting('musicFolder')).toBeNull();
+    store.addDownload({ trackId: 't1', fingerprint: 'f1', path: '/m/t1.mp3', size: 10 });
+    store.updateDownloadPath('t1', 'content://sd/Uno.mp3');
+    expect(store.getDownloads()[0]?.path).toBe('content://sd/Uno.mp3');
+  });
 });

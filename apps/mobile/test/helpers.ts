@@ -8,7 +8,8 @@ import {
 } from '@dsmn/shared';
 import { DatabaseSync } from 'node:sqlite';
 import { ServerUnreachableError, UnauthorizedError } from '../src/core/http.ts';
-import type { Downloader, FetchLike, FileStore, SqlDb, SqlValue } from '../src/core/types.ts';
+import { readableName } from '../src/core/fileNames.ts';
+import type { Downloader, FetchLike, FileStore, PlaceableTrack, SqlDb, SqlValue } from '../src/core/types.ts';
 
 type FakeResponse = { status: number; body?: unknown; headers?: Record<string, string> };
 type Route =
@@ -97,14 +98,30 @@ export function sqliteDb(db: DatabaseSync = new DatabaseSync(':memory:')): SqlDb
   };
 }
 
-/** FileStore en memoria. */
+/**
+ * FileStore en memoria. `folder` simula una carpeta elegida (la SD) como destino: los archivos van a `/sd/`
+ * con nombre legible (y " (1)" si se repite, como hace Android), y su espacio libre no se conoce.
+ */
 export function memoryFiles(
   freeBytes = 10 * 1024 ** 3,
-): FileStore & { files: Map<string, Uint8Array>; free: number } {
+): FileStore & { files: Map<string, Uint8Array>; free: number; folder: boolean } {
   const files = new Map<string, Uint8Array>();
+  const take = (from: string) => {
+    const data = files.get(from);
+    if (!data) throw new Error(`No existe ${from}`);
+    return data;
+  };
+  const destFor = (track: PlaceableTrack) => {
+    if (!store.folder) return `/music/${track.id}.${track.format}`;
+    const name = readableName(track);
+    let path = `/sd/${name}`;
+    for (let n = 1; files.has(path); n++) path = `/sd/${name.replace(/(\.\w+)$/, ` (${n})$1`)}`;
+    return path;
+  };
   const store = {
     files,
     free: freeBytes,
+    folder: false,
     musicDir: '/music',
     coversDir: '/covers',
     exists: (p: string) => files.has(p),
@@ -114,13 +131,24 @@ export function memoryFiles(
     read: async (p: string, offset: number, length: number) =>
       (files.get(p) ?? new Uint8Array()).slice(offset, offset + length),
     move: (from: string, to: string) => {
-      const data = files.get(from);
-      if (!data) throw new Error(`No existe ${from}`);
-      files.set(to, data);
+      files.set(to, take(from));
       files.delete(from);
     },
     remove: (p: string) => void files.delete(p),
-    freeBytes: () => store.free,
+    place: async (temp: string, track: PlaceableTrack) => {
+      const dest = destFor(track);
+      files.set(dest, take(temp));
+      files.delete(temp);
+      return dest;
+    },
+    copyToTarget: async (path: string, track: PlaceableTrack) => {
+      const dest = destFor(track);
+      files.set(dest, take(path));
+      return dest;
+    },
+    isInTarget: (p: string) => p.startsWith(store.folder ? '/sd/' : '/music/'),
+    freeBytes: () => (store.folder ? null : store.free),
+    tempFreeBytes: () => store.free,
   };
   return store;
 }
