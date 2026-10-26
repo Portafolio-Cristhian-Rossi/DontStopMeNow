@@ -1,5 +1,5 @@
 import { DEFAULT_PORT, PairResponseSchema, QrPayloadSchema, type QrPayload } from '@dsmn/shared';
-import { ServerUnreachableError, send, toServerError } from './http.ts';
+import { ServerError, ServerUnreachableError, send, toServerError } from './http.ts';
 import type { FetchLike, PairedServer } from './types.ts';
 
 export function parseQr(text: string): QrPayload | null {
@@ -78,4 +78,50 @@ export function pairManually(
   fetch: FetchLike,
 ): Promise<PairedServer> {
   return pair(normalizeAddress(address), code, deviceName, fetch);
+}
+
+/** Un problema al vincular, contado para la persona (título, explicación y si conviene reintentar). */
+export interface PairingProblem {
+  title: string;
+  body: string;
+  /** Vale la pena "Reintentar" con el mismo código (la compu no respondió). */
+  retry: boolean;
+}
+
+export const FOREIGN_QR: PairingProblem = {
+  title: 'Ese QR no es de DontStopMeNow',
+  body: 'Escaneá el que aparece en la web, en Dispositivos › Vincular un celular.',
+  retry: false,
+};
+
+const hostOf = (url: string) => url.replace(/^https?:\/\//, '');
+
+/** Traduce una falla de `pairWithQr` o `pairManually` a lo que muestra la pantalla Vincular. */
+export function describePairingError(err: unknown, triedUrls: string[] = []): PairingProblem {
+  if (err instanceof ServerUnreachableError) {
+    const hosts = triedUrls.map(hostOf);
+    const where =
+      hosts.length === 0
+        ? 'Tu compu no responde.'
+        : hosts.length === 1
+          ? `${hosts[0]} no responde.`
+          : `Ni ${hosts.join(' ni ')} responden.`;
+    return {
+      title: 'No llegamos a tu compu',
+      body: `${where} ¿El celular está en el mismo WiFi que la compu y DontStopMeNow está abierto ahí?`,
+      retry: true,
+    };
+  }
+  if (err instanceof ServerError && err.status === 401) {
+    return {
+      title: 'El código ya venció',
+      body: 'Los códigos duran unos minutos y sirven una sola vez. En la web tocá «Generar otro código» y volvé a probar.',
+      retry: false,
+    };
+  }
+  return {
+    title: 'No se pudo vincular',
+    body: err instanceof Error ? err.message : String(err),
+    retry: true,
+  };
 }

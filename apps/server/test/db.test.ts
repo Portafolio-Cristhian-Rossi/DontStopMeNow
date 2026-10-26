@@ -21,10 +21,23 @@ describe('base de datos', () => {
     db.exec('PRAGMA user_version = 1');
     db.prepare("INSERT INTO roots (path, status, created_at) VALUES ('D:\\Music', 'online', 0)").run();
     migrate(db);
-    expect({ ...db.prepare('PRAGMA user_version').get() }).toEqual({ user_version: 2 });
+    expect({ ...db.prepare('PRAGMA user_version').get() }).toEqual({ user_version: MIGRATIONS.length });
     for (const t of ['yt_sources', 'yt_jobs', 'yt_items']) {
       expect(db.prepare('SELECT name FROM sqlite_master WHERE name = ?').get(t)).toBeTruthy();
     }
+    expect(db.prepare('SELECT path FROM roots').all()).toEqual([{ path: 'D:\\Music' }]);
+  });
+
+  it('la migración 3 crea la tabla de favoritas sin tocar los datos existentes', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec(MIGRATIONS[0]!);
+    db.exec(MIGRATIONS[1]!);
+    db.exec('PRAGMA user_version = 2');
+    db.prepare("INSERT INTO roots (path, status, created_at) VALUES ('D:\\Music', 'online', 0)").run();
+    migrate(db);
+    expect({ ...db.prepare('PRAGMA user_version').get() }).toEqual({ user_version: 3 });
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'favorites'").get()).toBeTruthy();
     expect(db.prepare('SELECT path FROM roots').all()).toEqual([{ path: 'D:\\Music' }]);
   });
 

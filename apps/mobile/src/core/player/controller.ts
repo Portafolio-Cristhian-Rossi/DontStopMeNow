@@ -4,15 +4,22 @@ import { coverPath } from '../syncEngine.ts';
 import type { EngineLoop, EngineStatus, FileStore, PlayerEngine } from '../types.ts';
 import {
   addToQueue,
+  clearUpcoming,
   createQueue,
   currentId,
+  moveItem,
   moveTo,
   playNext,
+  removeAt,
   removeMissing,
   setShuffle,
   type QueueState,
   type RepeatMode,
-} from './queue.ts';
+} from '@dsmn/shared';
+
+/** Temporizador para dormir: apagado, al terminar la canción o a una hora (`until`, en ms). */
+export type SleepSetting = { kind: 'off' } | { kind: 'end' } | { kind: 'timer'; minutes: number };
+export type Sleep = { kind: 'off' } | { kind: 'end' } | { kind: 'timer'; minutes: number; until: number };
 
 export interface PlayerSnapshot {
   queue: QueueState | null;
@@ -20,6 +27,9 @@ export interface PlayerSnapshot {
   playing: boolean;
   positionMs: number;
   durationMs: number;
+  /** Velocidad de reproducción (1 = normal). */
+  rate: number;
+  sleep: Sleep;
 }
 
 export interface PlayerDeps {
@@ -49,7 +59,14 @@ export class PlayerController {
     playing: false,
     positionMs: 0,
     durationMs: 0,
+    rate: 1,
+    sleep: { kind: 'off' },
   };
+  private rate = 1;
+  private sleep: Sleep = { kind: 'off' };
+  private sleepTimer: ReturnType<typeof setTimeout> | null = null;
+  /** El próximo cambio de canción lo pidió la persona (no es el fin natural de la anterior). */
+  private manualSkip = false;
   private readonly listeners = new Set<() => void>();
   /** Los controles de la notificación se activan recién cuando se reproduce algo. */
   private nowPlayingActive = false;
@@ -64,6 +81,13 @@ export class PlayerController {
   constructor(private readonly deps: PlayerDeps) {
     deps.engine.onTrackChanged((index) => {
       if (!this.queue) return;
+      const manual = this.manualSkip;
+      this.manualSkip = false;
+      // "Al terminar la canción": terminó sola y el motor pasó a la siguiente → se pausa ahí.
+      if (this.sleep.kind === 'end' && !manual) {
+        this.sleep = { kind: 'off' };
+        deps.engine.pause();
+      }
       this.queue = moveTo(this.queue, index);
       this.updateNowPlaying();
       this.persist();
@@ -126,7 +150,7 @@ export class PlayerController {
       this.persist();
     } else {
       // Al terminar la última canción el motor queda "terminado": play no haría nada.
-      if (status.ended) this.deps.engine.skipTo(0);
+      if (status.ended) this.skip(0);
       this.deps.engine.play();
       if (!this.nowPlayingActive) {
         this.nowPlayingActive = true;
@@ -139,8 +163,8 @@ export class PlayerController {
   next(): void {
     const q = this.queue;
     if (!q) return;
-    if (q.index < q.order.length - 1) this.deps.engine.skipTo(q.index + 1);
-    else if (q.repeat === 'all') this.deps.engine.skipTo(0);
+    if (q.index < q.order.length - 1) this.skip(q.index + 1);
+    else if (q.repeat === 'all') this.skip(0);
   }
 
   previous(): void {
@@ -148,7 +172,7 @@ export class PlayerController {
     if (!q) return;
     if (this.deps.engine.status().positionMs > RESTART_THRESHOLD_MS || q.index === 0)
       this.deps.engine.seekTo(0);
-    else this.deps.engine.skipTo(q.index - 1);
+    else this.skip(q.index - 1);
   }
 
   seek(ms: number): void {
@@ -156,7 +180,71 @@ export class PlayerController {
   }
 
   jumpTo(index: number): void {
-    if (this.queue && index >= 0 && index < this.queue.order.length) this.deps.engine.skipTo(index);
+    if (this.queue && index >= 0 && index < this.queue.order.length) this.skip(index);
+  }
+
+  /** Cambio de canción pedido por la persona (para el temporizador "al terminar la canción"). */
+  private skip(index: number): void {
+    this.manualSkip = true;
+    this.deps.engine.skipTo(index);
+  }
+
+  setRate(rate: number): void {
+    this.rate = rate;
+    this.deps.engine.setRate(rate);
+    this.persist();
+    this.refresh();
+  }
+
+  setSleep(setting: SleepSetting): void {
+    if (this.sleepTimer) clearTimeout(this.sleepTimer);
+    this.sleepTimer = null;
+    if (setting.kind === 'timer') {
+      const ms = setting.minutes * 60_000;
+      this.sleep = { kind: 'timer', minutes: setting.minutes, until: Date.now() + ms };
+      this.sleepTimer = setTimeout(() => {
+        this.sleepTimer = null;
+        this.sleep = { kind: 'off' };
+        this.deps.engine.pause();
+        this.persist();
+        this.refresh();
+      }, ms);
+    } else {
+      this.sleep = setting;
+    }
+    this.refresh();
+  }
+
+  /** Quita una canción de las que vienen (la que suena se cambia con "siguiente"). */
+  removeAt(index: number): void {
+    const q = this.queue;
+    if (!q || index <= q.index || index >= q.order.length) return;
+    this.queue = removeAt(q, index);
+    this.deps.engine.remove(index);
+    this.persist();
+    this.refresh();
+  }
+
+  /** Reordena lo que viene después de la canción actual. */
+  move(from: number, to: number): void {
+    const q = this.queue;
+    if (!q || from === to || Math.min(from, to) <= q.index || Math.max(from, to) >= q.order.length) return;
+    const path = this.deps.downloadPath(q.order[from]!);
+    if (!path) return;
+    this.queue = moveItem(q, from, to);
+    this.deps.engine.remove(from);
+    this.deps.engine.insert({ uri: path }, to);
+    this.persist();
+    this.refresh();
+  }
+
+  clearUpcoming(): void {
+    const q = this.queue;
+    if (!q) return;
+    for (let i = q.order.length - 1; i > q.index; i--) this.deps.engine.remove(i);
+    this.queue = clearUpcoming(q);
+    this.persist();
+    this.refresh();
   }
 
   setShuffle(on: boolean): void {
@@ -164,6 +252,14 @@ export class PlayerController {
     const { positionMs, playing } = this.deps.engine.status();
     this.queue = setShuffle(this.queue, on, this.deps.random);
     this.loadEngine(positionMs, playing);
+  }
+
+  setRepeat(repeat: RepeatMode): void {
+    if (!this.queue || this.queue.repeat === repeat) return;
+    this.queue = { ...this.queue, repeat };
+    this.deps.engine.setLoop(LOOP[repeat]);
+    this.persist();
+    this.refresh();
   }
 
   cycleRepeat(): void {
@@ -206,6 +302,7 @@ export class PlayerController {
       return;
     }
     this.queue = queue;
+    if (typeof saved.rate === 'number' && saved.rate > 0) this.rate = saved.rate;
     this.loadEngine(currentId(queue) === before ? saved.positionMs : 0, false);
   }
 
@@ -234,6 +331,21 @@ export class PlayerController {
     this.refresh();
   }
 
+  /**
+   * Tras mover lo descargado a otra carpeta: la cola apunta a los archivos nuevos de esas canciones. La que
+   * suena no se toca (no se mueve mientras suena), así que no se corta.
+   */
+  replaceSources(trackIds: Set<string>): void {
+    const q = this.queue;
+    if (!q) return;
+    q.order.forEach((id, i) => {
+      const path = this.deps.downloadPath(id);
+      if (i === q.index || !path || !trackIds.has(id)) return;
+      this.deps.engine.remove(i);
+      this.deps.engine.insert({ uri: path }, i);
+    });
+  }
+
   /** Lo llama la capa de React cada 10 s mientras suena. */
   tick(): void {
     if (this.deps.engine.status().playing) this.persist();
@@ -244,6 +356,7 @@ export class PlayerController {
     const sources = q.order.map((id) => ({ uri: this.deps.downloadPath(id)! }));
     this.deps.engine.load(sources, q.index, positionMs, autoplay);
     this.deps.engine.setLoop(LOOP[q.repeat]);
+    this.deps.engine.setRate(this.rate);
     this.updateNowPlaying();
     this.persist();
     this.refresh();
@@ -278,7 +391,7 @@ export class PlayerController {
 
   private persist(positionMs = this.deps.engine.status().positionMs): void {
     if (!this.queue) return;
-    this.deps.store.setPlayerState({ queue: this.queue, positionMs });
+    this.deps.store.setPlayerState({ queue: this.queue, positionMs, rate: this.rate });
   }
 
   private refresh(status: EngineStatus = this.deps.engine.status()): void {
@@ -289,6 +402,8 @@ export class PlayerController {
       playing: status.playing,
       positionMs: status.positionMs,
       durationMs: status.durationMs,
+      rate: this.rate,
+      sleep: this.sleep,
     };
     for (const cb of this.listeners) cb();
   }

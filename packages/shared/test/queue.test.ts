@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   addToQueue,
+  clearUpcoming,
   createQueue,
   currentId,
+  moveItem,
   moveTo,
   playNext,
+  removeAt,
   removeMissing,
   setShuffle,
-} from '../src/core/player/queue.ts';
+} from '../src/queue.ts';
 
 /** Generador "aleatorio" determinista. */
 function seq(...values: number[]) {
@@ -86,5 +89,62 @@ describe('cola', () => {
   it('removeMissing con la actual al final pasa a la anterior existente si no hay siguiente', () => {
     const q = createQueue(['a', 'b', 'c'], 2, plain);
     expect(removeMissing(q, (id) => id !== 'c')).toMatchObject({ order: ['a', 'b'], index: 1 });
+  });
+
+  it('removeAt antes, en y después de la actual', () => {
+    const q = createQueue(['a', 'b', 'c', 'd'], 2, plain);
+    expect(removeAt(q, 0)).toMatchObject({ order: ['b', 'c', 'd'], original: ['b', 'c', 'd'], index: 1 });
+    expect(removeAt(q, 3)).toMatchObject({ order: ['a', 'b', 'c'], index: 2 });
+    expect(removeAt(q, 2)).toMatchObject({ order: ['a', 'b', 'd'], index: 2 });
+    expect(removeAt(createQueue(['a', 'b'], 1, plain), 1)).toMatchObject({ order: ['a'], index: 0 });
+    expect(removeAt(createQueue(['a'], 0, plain), 0)).toMatchObject({ order: [], index: -1 });
+    expect(removeAt(q, 9)).toBe(q);
+  });
+
+  it('removeAt descuenta un "a continuación" quitado', () => {
+    let q = playNext(playNext(createQueue(['a', 'b'], 0, plain), 'x'), 'y');
+    q = removeAt(q, 1);
+    expect(q.nextCount).toBe(1);
+    expect(playNext(q, 'z').order).toEqual(['a', 'y', 'z', 'b']);
+  });
+
+  it('con aleatorio, quitar y después apagarlo no pierde ni duplica canciones', () => {
+    let q = createQueue(['a', 'b', 'c', 'd', 'a'], 0, { shuffle: true, repeat: 'off' }, seq(0.3, 0.7, 0.1));
+    const quitada = q.order[3]!;
+    q = removeAt(q, 3);
+    q = setShuffle(q, false);
+    const esperado = ['a', 'b', 'c', 'd', 'a'];
+    esperado.splice(esperado.indexOf(quitada, quitada === 'a' ? 1 : 0), 1);
+    expect([...q.order].sort()).toEqual([...esperado].sort());
+    expect(q.order).toHaveLength(4);
+  });
+
+  it('moveItem mantiene la canción que suena', () => {
+    const q = createQueue(['a', 'b', 'c', 'd', 'e'], 2, plain);
+    expect(moveItem(q, 4, 3)).toMatchObject({ order: ['a', 'b', 'c', 'e', 'd'], index: 2 });
+    expect(moveItem(q, 0, 4)).toMatchObject({ order: ['b', 'c', 'd', 'e', 'a'], index: 1 });
+    expect(moveItem(q, 4, 0)).toMatchObject({ order: ['e', 'a', 'b', 'c', 'd'], index: 3 });
+    expect(moveItem(q, 2, 4)).toMatchObject({ order: ['a', 'b', 'd', 'e', 'c'], index: 4 });
+    expect(moveItem(q, 1, 1)).toBe(q);
+  });
+
+  it('moveItem con aleatorio no toca el orden original', () => {
+    const q = createQueue(['a', 'b', 'c'], 0, { shuffle: true, repeat: 'off' }, seq(0.5));
+    const moved = moveItem(q, 1, 2);
+    expect(moved.original).toEqual(['a', 'b', 'c']);
+    expect(currentId(setShuffle(moved, false))).toBe('a');
+  });
+
+  it('clearUpcoming deja solo hasta la actual', () => {
+    const q = playNext(createQueue(['a', 'b', 'c', 'd'], 1, plain), 'x');
+    expect(clearUpcoming(q)).toMatchObject({
+      order: ['a', 'b'],
+      original: ['a', 'b'],
+      index: 1,
+      nextCount: 0,
+    });
+    const s = createQueue(['a', 'b', 'c', 'd'], 0, { shuffle: true, repeat: 'off' }, seq(0.4));
+    const cleared = setShuffle(clearUpcoming(s), false);
+    expect(cleared.order).toEqual(['a']);
   });
 });

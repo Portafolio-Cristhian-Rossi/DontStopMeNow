@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dsmn-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "-w", "@dsmn/server"],
+      "port": 4747
+    },
+    {
+      "name": "dsmn-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "@dsmn/web"],
+      "port": 5173
+    }
+  ]
+}

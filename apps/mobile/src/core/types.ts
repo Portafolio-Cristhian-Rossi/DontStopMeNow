@@ -1,3 +1,4 @@
+import type { Track } from '@dsmn/shared';
 /** Subconjunto de fetch que usa la app (el de React Native lo cumple). */
 export type FetchLike = (
   url: string,
@@ -29,8 +30,15 @@ export interface SqlDb {
   first<T>(sql: string, ...params: SqlValue[]): T | null;
 }
 
-/** Archivos de la app (en el celular, el almacenamiento privado; en los tests, memoria). */
+/** Lo que hace falta de una canción para guardarla con un nombre legible. */
+export type PlaceableTrack = Pick<Track, 'id' | 'title' | 'artist' | 'format'>;
+
+/**
+ * Archivos de la app (en el celular, el almacenamiento privado más, opcionalmente, una carpeta elegida como
+ * la tarjeta SD; en los tests, memoria).
+ */
 export interface FileStore {
+  /** Carpeta interna de música: temporales de las descargas y destino "memoria del celular". */
   musicDir: string;
   coversDir: string;
   exists(path: string): boolean;
@@ -40,7 +48,16 @@ export interface FileStore {
   read(path: string, offset: number, length: number): Promise<Uint8Array>;
   move(from: string, to: string): void;
   remove(path: string): void;
-  freeBytes(): number;
+  /** Deja una canción ya verificada (en `temp`, dentro de musicDir) en el destino actual; devuelve dónde quedó. */
+  place(temp: string, track: PlaceableTrack): Promise<string>;
+  /** Copia un archivo ya guardado al destino actual (para mover lo descargado); devuelve la copia. */
+  copyToTarget(path: string, track: PlaceableTrack): Promise<string>;
+  /** ¿El archivo está en el destino actual? */
+  isInTarget(path: string): boolean;
+  /** Espacio libre del destino, o null si no se puede saber (carpeta elegida). */
+  freeBytes(): number | null;
+  /** Espacio libre de la memoria interna, donde se bajan los temporales. */
+  tempFreeBytes(): number;
 }
 
 /**
@@ -68,6 +85,8 @@ export interface PlayerEngine {
   skipTo(index: number): void;
   seekTo(ms: number): void;
   setLoop(mode: EngineLoop): void;
+  /** Velocidad de reproducción (1 = normal); se mantiene al cargar otra cola. */
+  setRate(rate: number): void;
   insert(source: { uri: string }, index: number): void;
   add(source: { uri: string }): void;
   remove(index: number): void;

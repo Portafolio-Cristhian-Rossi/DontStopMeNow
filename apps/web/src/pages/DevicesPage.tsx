@@ -3,6 +3,9 @@ import QRCode from 'qrcode';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.ts';
 import { queryKeys, useDevices } from '../api/queries.ts';
+import { Icon } from '../components/Icon.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
+import { QrPayloadSchema } from '@dsmn/shared';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -18,7 +21,7 @@ const DEVICES_POLL_MS = 2500;
 
 function PairingCard({ deviceCount }: { deviceCount: number | undefined }) {
   const pairing = useQuery({
-    queryKey: ['pairing-code'],
+    queryKey: queryKeys.pairingCode,
     queryFn: api.pairingCode,
     staleTime: Infinity,
     gcTime: 0,
@@ -32,7 +35,8 @@ function PairingCard({ deviceCount }: { deviceCount: number | undefined }) {
   useEffect(() => {
     if (!data) return;
     let cancelled = false;
-    void QRCode.toString(data.qrPayload, { type: 'svg', margin: 0 }).then((svg) => {
+    // Margen de 4 módulos (el que pide el estándar): sin él, a la cámara le cuesta encontrar el código.
+    void QRCode.toString(data.qrPayload, { type: 'svg', margin: 4 }).then((svg) => {
       if (!cancelled) setQr(`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`);
     });
     // Al vencer, se pide un código nuevo.
@@ -60,16 +64,65 @@ function PairingCard({ deviceCount }: { deviceCount: number | undefined }) {
   if (pairing.error) return <p className="error">{pairing.error.message}</p>;
   if (!data) return <p className="muted">Generando código…</p>;
 
+  const addresses = lanAddresses(data.qrPayload);
+
   return (
-    <div className="card toolbar" style={{ gap: '2rem', alignItems: 'flex-start' }}>
-      <div className="qr">{qr && <img src={qr} alt="Código QR de vinculación" />}</div>
-      <div>
-        <p>Abrí la app en el celular y escaneá el código, o escribí:</p>
-        <p className="code">{data.code}</p>
-        <p className="muted">Vence en {countdown(data.expiresAt - Math.max(now, pairing.dataUpdatedAt))}</p>
+    <section className="card pairing" aria-labelledby="vincular">
+      <div className="pairing-qr">
+        <div className="qr">{qr && <img src={qr} alt="Código QR de vinculación" />}</div>
       </div>
-    </div>
+      <div className="pairing-info">
+        <h2 id="vincular">Vincular un celular</h2>
+        <ol className="steps">
+          <li>
+            <span>Conectá el celular al mismo WiFi que esta compu.</span>
+          </li>
+          <li>
+            <span>
+              Abrí DontStopMeNow en el celular y tocá <strong>Vincular</strong>.
+            </span>
+          </li>
+          <li>
+            <span>Escaneá el código, o escribí la dirección y el código a mano.</span>
+          </li>
+        </ol>
+        <div className="pairing-facts">
+          <div className="fact">
+            <span className="fact-label">Código</span>
+            <span className="code">{data.code}</span>
+            <span className="muted">
+              Vence en {countdown(data.expiresAt - Math.max(now, pairing.dataUpdatedAt))}
+            </span>
+          </div>
+          {addresses.length > 0 && (
+            <div className="fact">
+              <span className="fact-label">Dirección</span>
+              <span className="address">{addresses[0]}</span>
+              {addresses.length > 1 && (
+                <span className="muted">También: {addresses.slice(1).join(', ')}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <div>
+          <button type="button" onClick={() => void refetch()}>
+            <Icon name="refrescar" size={18} />
+            Generar otro código
+          </button>
+        </div>
+      </div>
+    </section>
   );
+}
+
+/** Las direcciones que lleva el QR, sin "http://", para escribirlas a mano en el celular. */
+function lanAddresses(qrPayload: string): string[] {
+  try {
+    const parsed = QrPayloadSchema.safeParse(JSON.parse(qrPayload));
+    return parsed.success ? parsed.data.urls.map((u) => u.replace(/^https?:\/\//, '')) : [];
+  } catch {
+    return [];
+  }
 }
 
 export function DevicesPage() {
@@ -90,37 +143,32 @@ export function DevicesPage() {
 
   return (
     <>
-      <h1>Dispositivos</h1>
-      <h2>Vincular un celular</h2>
+      <PageHeader
+        title="Dispositivos"
+        subtitle="Vinculá tu celular para bajar música y escucharla sin conexión."
+      />
       <PairingCard deviceCount={devices.data?.length} />
 
       <h2>Celulares vinculados</h2>
       {error && <p className="error">{error}</p>}
       {devices.data?.length ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Vinculado</th>
-              <th>Visto por última vez</th>
-              <th aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {devices.data.map((d) => (
-              <tr key={d.id}>
-                <td>{d.name}</td>
-                <td>{formatDate(d.createdAt)}</td>
-                <td>{d.lastSeenAt ? formatDate(d.lastSeenAt) : 'Nunca'}</td>
-                <td>
-                  <button type="button" className="small danger" onClick={() => void revoke(d.id, d.name)}>
-                    Revocar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="list-plain">
+          {devices.data.map((d) => (
+            <li key={d.id} className="device-row">
+              <Icon name="dispositivos" size={22} />
+              <span>
+                <strong>{d.name}</strong>
+                <span className="muted">
+                  Vinculado el {formatDate(d.createdAt)} · Visto por última vez:{' '}
+                  {d.lastSeenAt ? formatDate(d.lastSeenAt) : 'Nunca'}
+                </span>
+              </span>
+              <button type="button" className="small danger" onClick={() => void revoke(d.id, d.name)}>
+                Revocar
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : devices.isPending ? (
         <p className="muted">Cargando…</p>
       ) : (

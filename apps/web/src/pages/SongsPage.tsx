@@ -1,8 +1,11 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useCatalog } from '../api/queries.ts';
 import { AddToPlaylistDialog } from '../components/AddToPlaylistDialog.tsx';
+import { Icon } from '../components/Icon.tsx';
 import { LibraryTabs } from '../components/LibraryTabs.tsx';
+import { PageHeader } from '../components/PageHeader.tsx';
 import { TrackTable } from '../components/TrackTable.tsx';
+import { useCurrentTrackId, usePlayerActions } from '../player/PlayerContext.tsx';
 import { searchKey } from '@dsmn/shared';
 
 /** Más filas que esto vuelven lenta la página; se pide refinar la búsqueda. */
@@ -41,29 +44,45 @@ export function SongsPage() {
     [],
   );
 
+  const shown = useMemo(() => matches.slice(0, MAX_ROWS), [matches]);
+  const player = usePlayerActions();
+  const currentId = useCurrentTrackId();
+  // La cola es lo que se ve en la búsqueda, desde la canción elegida.
+  const play = useCallback(
+    (index: number) =>
+      player.playList(
+        shown.map((t) => t.id),
+        index,
+      ),
+    [player, shown],
+  );
+
   if (isPending) return <p className="muted">Cargando…</p>;
   if (error) return <p className="error">{error.message}</p>;
 
-  const shown = matches.slice(0, MAX_ROWS);
-
   return (
     <>
-      <h1>Biblioteca</h1>
-      <LibraryTabs />
-      <div className="toolbar">
-        <input
-          type="search"
-          role="searchbox"
-          aria-label="Buscar canciones"
-          placeholder="Buscar por título, artista o álbum"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <span className="muted">{matches.length} canciones</span>
-        <button type="button" disabled={selected.size === 0} onClick={() => setAdding(true)}>
-          Agregar a lista… {selected.size > 0 && `(${selected.size})`}
-        </button>
-      </div>
+      <PageHeader title="Biblioteca" subtitle={`${matches.length} canciones`}>
+        <label className="search-field">
+          <Icon name="buscar" size={18} />
+          <input
+            type="search"
+            role="searchbox"
+            aria-label="Buscar canciones"
+            placeholder="Buscar por título, artista o álbum"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+      </PageHeader>
+      <LibraryTabs>
+        <div className="chips">
+          <button type="button" disabled={selected.size === 0} onClick={() => setAdding(true)}>
+            <Icon name="mas" size={18} />
+            Agregar a lista… {selected.size > 0 && `(${selected.size})`}
+          </button>
+        </div>
+      </LibraryTabs>
       {notice && (
         <p className="muted" role="status">
           {notice}
@@ -86,7 +105,15 @@ export function SongsPage() {
           Mostrando {MAX_ROWS} de {matches.length}. Refiná la búsqueda para ver el resto.
         </p>
       )}
-      <TrackTable tracks={shown} albums={albums} selectable selected={selected} onToggle={toggle} />
+      <TrackTable
+        tracks={shown}
+        albums={albums}
+        selectable
+        selected={selected}
+        onToggle={toggle}
+        onPlay={play}
+        currentId={currentId}
+      />
     </>
   );
 }

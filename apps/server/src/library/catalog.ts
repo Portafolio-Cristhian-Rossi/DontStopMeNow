@@ -119,5 +119,15 @@ export function buildCatalog(db: DatabaseSync, serverId: string): Catalog {
       .all() as unknown as PlaylistRow[]
   ).map((row) => toPlaylist(db, row));
 
-  return { serverId, revision: getRevision(db), tracks: trackRows.map(toTrack), albums, playlists };
+  const favorites = new Map(
+    (
+      db.prepare('SELECT fingerprint, created_at FROM favorites').all() as {
+        fingerprint: string;
+        created_at: number;
+      }[]
+    ).map((f) => [f.fingerprint, f.created_at]),
+  );
+  const tracks = trackRows.map((r) => ({ ...toTrack(r), favoritedAt: favorites.get(r.fingerprint) ?? null }));
+
+  return { serverId, revision: getRevision(db), tracks, albums, playlists };
 }

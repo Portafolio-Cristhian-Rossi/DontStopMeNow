@@ -9,6 +9,7 @@ export const queryKeys = {
   ytdlp: ['ytdlp'],
   downloadJobs: ['download-jobs'],
   ytSources: ['yt-sources'],
+  pairingCode: ['pairing-code'],
 } as const;
 
 export const useCatalog = () => useQuery({ queryKey: queryKeys.catalog, queryFn: api.catalog });

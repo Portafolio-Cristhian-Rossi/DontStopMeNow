@@ -22,9 +22,14 @@ class Lookup {
   private paths = new Map<string, string>();
   private current: Catalog | null = null;
 
-  update(downloads: StoredDownload[], catalog: Catalog | null): void {
+  /** Devuelve las canciones que siguen descargadas pero cambiaron de archivo (se movieron de carpeta). */
+  update(downloads: StoredDownload[], catalog: Catalog | null): Set<string> {
+    const before = this.paths;
     this.paths = new Map(downloads.map((d) => [d.trackId, d.path]));
     this.current = catalog;
+    const moved = new Set<string>();
+    for (const [id, path] of this.paths) if (before.has(id) && before.get(id) !== path) moved.add(id);
+    return moved;
   }
 
   downloadPath = (id: string) => this.paths.get(id) ?? null;
@@ -82,10 +87,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player]);
 
-  // Si una sincronización (o "borrar todo") quitó canciones, salen de la cola.
+  // Si una sincronización (o "borrar todo") quitó canciones, salen de la cola; si se movieron, se recargan.
   useEffect(() => {
-    lookup.update(app.downloads, app.catalog);
+    const moved = lookup.update(app.downloads, app.catalog);
     player.pruneMissing();
+    if (moved.size > 0) player.replaceSources(moved);
   }, [lookup, player, app.downloads, app.catalog]);
 
   // Sin este permiso (Android 13+) no aparecen los controles en la notificación.

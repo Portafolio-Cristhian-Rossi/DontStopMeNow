@@ -33,6 +33,20 @@ describe('libraryView', () => {
     });
     expect(libraryView(catalog, new Set(['a', 'b'])).artists.map((a) => a.name)).toEqual(['Nada', 'Ñandú']);
   });
+
+  it('favoritas: solo las descargadas, la última marcada primero y una vez por huella', () => {
+    const catalog = makeCatalog({
+      tracks: [
+        makeTrack('a', { favoritedAt: 100, fingerprint: 'fa' }),
+        makeTrack('b', { favoritedAt: 300, fingerprint: 'fb' }),
+        makeTrack('b2', { favoritedAt: 300, fingerprint: 'fb' }),
+        makeTrack('c', { favoritedAt: 200, fingerprint: 'fc' }),
+        makeTrack('d', { fingerprint: 'fd' }),
+      ],
+    });
+    const view = libraryView(catalog, new Set(['a', 'b', 'b2', 'd']));
+    expect(view.favorites.map((t) => t.id)).toEqual(['b', 'a']);
+  });
 });
 
 describe('selectionSummary', () => {

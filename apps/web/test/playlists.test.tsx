@@ -83,7 +83,7 @@ describe('listas', () => {
   it('crea una lista de carpeta navegando subcarpetas', async () => {
     const server = statefulServer([]);
     renderWithProviders(<App />, { route: '/listas' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Nueva lista de carpeta' }));
+    await userEvent.click(await screen.findByRole('radio', { name: /Desde una carpeta/ }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Nombre de la lista de carpeta' }), 'Rock');
     await userEvent.click(await screen.findByRole('button', { name: 'Rock' }));
     await waitFor(() => expect(screen.getByText('/musica/Rock')).toBeInTheDocument());

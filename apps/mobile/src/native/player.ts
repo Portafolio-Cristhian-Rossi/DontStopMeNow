@@ -34,10 +34,12 @@ export function createPlayerEngine(): PlayerEngine {
   const statusListeners = new Set<(status: EngineStatus) => void>();
   let lockScreenActive = false;
   let loop: AudioPlaylist['loop'] = 'none';
+  let rate = 1;
   let subscriptions: { remove(): void }[] = [];
 
   function create(sources: { uri: string }[]): AudioPlaylist {
     const created = createAudioPlaylist({ sources, loop, updateInterval: UPDATE_INTERVAL_MS });
+    created.playbackRate = rate;
     subscriptions = [
       created.addListener('trackChanged', ({ currentIndex }) =>
         trackListeners.forEach((cb) => cb(currentIndex)),
@@ -71,6 +73,10 @@ export function createPlayerEngine(): PlayerEngine {
     setLoop: (mode) => {
       loop = mode;
       playlist.loop = mode;
+    },
+    setRate: (value) => {
+      rate = value;
+      playlist.playbackRate = value;
     },
     insert: (source, index) => playlist.insert(source, index),
     add: (source) => playlist.add(source),

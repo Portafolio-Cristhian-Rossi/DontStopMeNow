@@ -78,3 +78,22 @@ npm run export:android -w @dsmn/mobile # empaqueta el JavaScript (comprueba que 
 
 La lógica (`src/core`) es TypeScript puro y se prueba con Vitest; `src/native` adapta las APIs de Expo;
 `app/` son las pantallas (expo-router).
+
+### Ver los cambios en el celular (development build)
+
+Expo Go no sirve: la app usa módulos nativos que no trae (por ejemplo `react-native-zeroconf`). En su lugar se
+instala una vez un _development build_, que carga el JavaScript desde tu compu y se actualiza al guardar.
+
+```bash
+cd apps/mobile
+npx eas-cli build -p android --profile development   # una vez, y de nuevo solo si cambia algo nativo
+npx expo start --dev-client                          # el día a día: abrí "DontStopMeNow (dev)" en el celular
+```
+
+- Se instala como **DontStopMeNow (dev)** (paquete `com.cristhianrossi.dontstopmenow.dev`), al lado de la app de
+  release, sin pisarla. Lo arma `app.config.ts` cuando `APP_VARIANT=development` (lo define `eas.json`).
+- El celular tiene que estar en el mismo WiFi que la compu. Si la app dev no lista tu compu, escaneá el QR que
+  muestra `expo start` o usá `npx expo start --dev-client --tunnel`.
+- Los `console.log` y los errores salen en la terminal; con `j` se abren las React Native DevTools.
+- Hay que volver a compilar cuando se agrega o saca una dependencia nativa o se cambian plugins o permisos en
+  `app.json`. Pantallas, lógica y estilos se ven al instante.

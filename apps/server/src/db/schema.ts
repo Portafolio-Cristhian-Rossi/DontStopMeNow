@@ -123,4 +123,11 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX yt_items_job ON yt_items (job_id);
   `,
+  // 3: favoritas (solo tabla nueva). Van por huella para sobrevivir a mover o volver a agregar el archivo.
+  `
+  CREATE TABLE favorites (
+    fingerprint TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL
+  );
+  `,
 ];

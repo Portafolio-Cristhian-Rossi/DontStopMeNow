@@ -68,6 +68,8 @@ export const api = {
   updatePlaylist: (id: string, req: UpdatePlaylistRequest) =>
     request<Playlist>('PATCH', `/api/admin/playlists/${encodeURIComponent(id)}`, req),
   deletePlaylist: (id: string) => request<void>('DELETE', `/api/admin/playlists/${encodeURIComponent(id)}`),
+  setFavorite: (trackId: string, on: boolean) =>
+    request<void>(on ? 'PUT' : 'DELETE', `/api/admin/favorites/${encodeURIComponent(trackId)}`),
   pairingCode: () => request<PairingCodeResponse>('POST', '/api/admin/pairing-code'),
   devices: () => request<Device[]>('GET', '/api/admin/devices'),
   revokeDevice: (id: string) => request<void>('DELETE', `/api/admin/devices/${encodeURIComponent(id)}`),

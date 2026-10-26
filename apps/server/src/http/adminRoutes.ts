@@ -10,6 +10,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { getRevision } from '../db/meta.ts';
 import type { BusEvents } from '../events.ts';
+import { setFavorite } from '../library/favorites.ts';
 import { createPlaylist, deletePlaylist, updatePlaylist } from '../library/playlists.ts';
 import { addRoot, browse, listFolders, listPlaces, listRoots, removeRoot } from '../library/roots.ts';
 import type { AppDeps } from './app.ts';
@@ -70,6 +71,16 @@ export function adminRoutes(app: FastifyInstance, deps: AppDeps): void {
   app.post('/api/admin/playlists', admin, async (req, reply) => {
     const body = parseBody(CreatePlaylistRequestSchema, req.body);
     return reply.status(201).send(createPlaylist(db, bus, body));
+  });
+
+  app.put<IdParams>('/api/admin/favorites/:id', admin, async (req, reply) => {
+    setFavorite(db, bus, req.params.id, true);
+    return reply.status(204).send();
+  });
+
+  app.delete<IdParams>('/api/admin/favorites/:id', admin, async (req, reply) => {
+    setFavorite(db, bus, req.params.id, false);
+    return reply.status(204).send();
   });
 
   app.patch<IdParams>('/api/admin/playlists/:id', admin, async (req) =>

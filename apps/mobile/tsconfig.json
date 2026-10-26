@@ -7,5 +7,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["app", "src", "test", "expo-env.d.ts", "vitest.config.ts"]
+  "include": ["app", "src", "test", "vitest.config.ts", "app.config.ts"]
 }

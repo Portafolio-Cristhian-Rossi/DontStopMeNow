@@ -6,6 +6,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": { "APP_VARIANT": "development" },
       "android": { "buildType": "apk" }
     },
     "preview": {

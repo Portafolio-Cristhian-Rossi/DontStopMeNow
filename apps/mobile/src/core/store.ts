@@ -1,5 +1,5 @@
-import type { Catalog, LocalDownload, Selection } from '@dsmn/shared';
-import type { QueueState } from './player/queue.ts';
+import type { Catalog, LocalDownload, QueueState, Selection } from '@dsmn/shared';
+import { supersededBy, type PendingChange, type StoredChange } from './pending.ts';
 import type { PairedServer, SqlDb } from './types.ts';
 
 export type StoredDownload = LocalDownload & { path: string; size: number };
@@ -8,6 +8,8 @@ export type StoredDownload = LocalDownload & { path: string; size: number };
 export interface SavedPlayerState {
   queue: QueueState;
   positionMs: number;
+  /** Velocidad elegida; los estados guardados por versiones anteriores no la tienen. */
+  rate?: number;
 }
 
 const SCHEMA = `
@@ -35,6 +37,12 @@ const SCHEMA = `
   );
   CREATE TABLE IF NOT EXISTS failures (
     track_id TEXT PRIMARY KEY, error TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pending_changes (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL
   );
 `;
 
@@ -136,6 +144,40 @@ export class LocalStore {
       d.path,
       d.size,
     );
+  }
+
+  updateDownloadPath(trackId: string, path: string): void {
+    this.db.run('UPDATE downloads SET path = ? WHERE track_id = ?', path, trackId);
+  }
+
+  /** Cambios hechos en el celular que todavía no llegaron a la compu, en el orden en que se hicieron. */
+  getPending(): StoredChange[] {
+    return this.db
+      .all<{ seq: number; json: string }>('SELECT seq, json FROM pending_changes ORDER BY seq')
+      .map((r) => ({ seq: r.seq, change: JSON.parse(r.json) as PendingChange }));
+  }
+
+  /** Guarda un cambio nuevo y descarta los que deja sin efecto. */
+  addPending(change: PendingChange): void {
+    for (const seq of supersededBy(change, this.getPending())) this.removePending(seq);
+    this.db.run('INSERT INTO pending_changes (json) VALUES (?)', JSON.stringify(change));
+  }
+
+  removePending(seq: number): void {
+    this.db.run('DELETE FROM pending_changes WHERE seq = ?', seq);
+  }
+
+  clearPending(): void {
+    this.db.run('DELETE FROM pending_changes');
+  }
+
+  getSetting(key: string): string | null {
+    return this.db.first<{ value: string }>('SELECT value FROM settings WHERE key = ?', key)?.value ?? null;
+  }
+
+  setSetting(key: string, value: string | null): void {
+    if (value === null) this.db.run('DELETE FROM settings WHERE key = ?', key);
+    else this.db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', key, value);
   }
 
   removeDownload(trackId: string): void {

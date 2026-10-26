@@ -87,7 +87,8 @@ describe('canciones: bibliotecas grandes', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar canciones' }), 'Tema 59');
     await waitFor(() => expect(screen.getAllByRole('row').length).toBe(12)); // Tema 59 y Tema 590-599
     expect(screen.queryByText(/Mostrando 500/)).not.toBeInTheDocument();
-  });
+    // 500 filas en jsdom tardan ~3 s solas; con los demás archivos en paralelo pasan de 5 s.
+  }, 15_000);
 });
 
 describe('reintentos', () => {

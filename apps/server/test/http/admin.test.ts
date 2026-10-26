@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { QrPayloadSchema } from '@dsmn/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { bumpRevision } from '../../src/library/revision.ts';
-import { makeApp } from '../helpers/app.ts';
+import { REMOTE, makeApp } from '../helpers/app.ts';
 import { makeLibrary } from '../helpers/fixtures.ts';
 import { makeMp3 } from '../helpers/mp3.ts';
 
@@ -91,6 +91,26 @@ describe('rutas de gestión', () => {
       (await app.inject({ method: 'PATCH', url: `/api/admin/playlists/${id}`, payload: { name: 'x' } }))
         .statusCode,
     ).toBe(404);
+  });
+
+  it('favoritas: marcar, desmarcar, desconocida y solo desde la compu', async () => {
+    const { app, deps } = await makeApp();
+    const libDir = await makeLibrary({ 'a.mp3': makeMp3({ title: 'a' }) });
+    await app.inject({ method: 'POST', url: '/api/admin/roots', payload: { path: libDir } });
+    await vi.waitFor(() => expect(deps.scanner.status()).toMatchObject({ running: false, total: 1 }));
+    const id = (await app.inject({ url: '/api/catalog' })).json().tracks[0].id as string;
+    const fav = async () => (await app.inject({ url: '/api/catalog' })).json().tracks[0].favoritedAt;
+
+    expect((await app.inject({ method: 'PUT', url: `/api/admin/favorites/${id}` })).statusCode).toBe(204);
+    expect(await fav()).toEqual(expect.any(Number));
+    expect((await app.inject({ method: 'PUT', url: `/api/admin/favorites/${id}` })).statusCode).toBe(204);
+    expect((await app.inject({ method: 'DELETE', url: `/api/admin/favorites/${id}` })).statusCode).toBe(204);
+    expect(await fav()).toBeNull();
+    expect((await app.inject({ method: 'PUT', url: '/api/admin/favorites/nope' })).statusCode).toBe(404);
+    expect(
+      (await app.inject({ method: 'PUT', url: `/api/admin/favorites/${id}`, remoteAddress: REMOTE }))
+        .statusCode,
+    ).toBe(403);
   });
 
   it('browse, scan e issues', async () => {

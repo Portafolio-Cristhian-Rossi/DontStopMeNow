@@ -72,3 +72,21 @@ describe('computeSyncPlan', () => {
     ]);
   });
 });
+
+describe('selección de Favoritas', () => {
+  it('baja las favoritas (una copia por huella) y se borran al desmarcarlas', () => {
+    const c = {
+      ...cat,
+      tracks: [
+        { ...track('t1'), favoritedAt: 5 },
+        { ...track('t3'), favoritedAt: 9 },
+        { ...track('t4'), fingerprint: 'fp-t3', favoritedAt: 9 },
+        track('t2'),
+      ],
+    };
+    const plan = computeSyncPlan(c, [{ kind: 'favorites', id: 'favoritas' }], [dl('t2')]);
+    expect(plan.download.map((t) => t.id)).toEqual(['t1', 't3']);
+    expect(plan.delete).toEqual(['t2']);
+    expect(plan.prunedSelection).toEqual([{ kind: 'favorites', id: 'favoritas' }]);
+  });
+});

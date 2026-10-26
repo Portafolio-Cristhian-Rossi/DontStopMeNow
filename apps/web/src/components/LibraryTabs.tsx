@@ -1,13 +1,18 @@
+import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
 
-export function LibraryTabs() {
+/** Pestañas de la Biblioteca (sin `<nav>` propio: la única navegación es la barra lateral). */
+export function LibraryTabs({ children }: { children?: ReactNode }) {
   return (
-    <nav className="tabs" aria-label="Biblioteca">
-      <NavLink to="/biblioteca/albumes" end>
-        Álbumes
-      </NavLink>
-      <NavLink to="/biblioteca/artistas">Artistas</NavLink>
-      <NavLink to="/biblioteca/canciones">Canciones</NavLink>
-    </nav>
+    <div className="tabs-bar">
+      <div className="tabs" role="group" aria-label="Vistas de la biblioteca">
+        <NavLink to="/biblioteca/albumes" end>
+          Álbumes
+        </NavLink>
+        <NavLink to="/biblioteca/artistas">Artistas</NavLink>
+        <NavLink to="/biblioteca/canciones">Canciones</NavLink>
+      </div>
+      {children}
+    </div>
   );
 }

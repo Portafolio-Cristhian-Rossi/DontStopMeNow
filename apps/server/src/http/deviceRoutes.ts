@@ -1,9 +1,24 @@
 import { createReadStream, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { PairRequestSchema, type AudioFormat, type PairResponse } from '@dsmn/shared';
+import {
+  AddTracksRequestSchema,
+  DeviceCreatePlaylistRequestSchema,
+  PairRequestSchema,
+  RenamePlaylistRequestSchema,
+  type AudioFormat,
+  type PairResponse,
+} from '@dsmn/shared';
 import type { FastifyInstance } from 'fastify';
 import { getRevision } from '../db/meta.ts';
 import { buildCatalog } from '../library/catalog.ts';
+import { setFavorite } from '../library/favorites.ts';
+import {
+  addTracksToPlaylist,
+  createDevicePlaylist,
+  deleteManualPlaylist,
+  removeTrackFromPlaylist,
+  renamePlaylist,
+} from '../library/playlists.ts';
 import type { AppDeps } from './app.ts';
 import { HttpError, parseBody } from './errors.ts';
 import { parseRange } from './range.ts';
@@ -26,8 +41,12 @@ interface FileRow {
   status: 'online' | 'offline';
 }
 
+const device = { config: { access: 'device' as const } };
+
+type IdParams = { Params: { id: string } };
+
 export function deviceRoutes(app: FastifyInstance, deps: AppDeps): void {
-  const { db, pairing } = deps;
+  const { db, bus, pairing } = deps;
 
   app.post('/api/pair', { config: { access: 'public' } }, async (req): Promise<PairResponse> => {
     const body = parseBody(PairRequestSchema, req.body);
@@ -97,5 +116,42 @@ export function deviceRoutes(app: FastifyInstance, deps: AppDeps): void {
       reply.header('content-type', row.mime).header('cache-control', 'public, max-age=31536000, immutable');
       return reply.send(createReadStream(join(deps.config.coversDir, req.params.id)));
     },
+  );
+
+  // Favoritas y listas desde el celular. Todas son idempotentes: el celular puede reintentar lo que mandó sin
+  // conexión sin duplicar nada.
+  app.put<IdParams>('/api/favorites/:id', device, async (req, reply) => {
+    setFavorite(db, bus, req.params.id, true);
+    return reply.status(204).send();
+  });
+
+  app.delete<IdParams>('/api/favorites/:id', device, async (req, reply) => {
+    setFavorite(db, bus, req.params.id, false);
+    return reply.status(204).send();
+  });
+
+  app.post('/api/playlists', device, async (req, reply) =>
+    reply
+      .status(201)
+      .send(createDevicePlaylist(db, bus, parseBody(DeviceCreatePlaylistRequestSchema, req.body))),
+  );
+
+  app.patch<IdParams>('/api/playlists/:id', device, async (req) =>
+    renamePlaylist(db, bus, req.params.id, parseBody(RenamePlaylistRequestSchema, req.body).name),
+  );
+
+  app.delete<IdParams>('/api/playlists/:id', device, async (req, reply) => {
+    deleteManualPlaylist(db, bus, req.params.id);
+    return reply.status(204).send();
+  });
+
+  app.post<IdParams>('/api/playlists/:id/tracks', device, async (req) =>
+    addTracksToPlaylist(db, bus, req.params.id, parseBody(AddTracksRequestSchema, req.body).trackIds),
+  );
+
+  app.delete<{ Params: { id: string; trackId: string } }>(
+    '/api/playlists/:id/tracks/:trackId',
+    device,
+    async (req) => removeTrackFromPlaylist(db, bus, req.params.id, req.params.trackId),
   );
 }
