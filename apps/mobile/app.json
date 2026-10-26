@@ -6,8 +6,14 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "android": {
       "package": "com.cristhianrossi.dontstopmenow",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#FF5A3C"
+      },
       "permissions": ["CHANGE_WIFI_MULTICAST_STATE", "ACCESS_WIFI_STATE", "POST_NOTIFICATIONS"],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
