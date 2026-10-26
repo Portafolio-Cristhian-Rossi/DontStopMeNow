@@ -26,6 +26,7 @@ function setup(behave?: (url: string, attempt: number) => Behavior) {
     trackUrl: URL,
     coverUrl: (id: string) => `http://srv/api/covers/${id}`,
     authHeaders: () => ({ Authorization: 'Bearer tok' }),
+    applyChange: vi.fn(async () => {}),
   };
   const store = new LocalStore(sqliteDb());
   store.setServer(server);

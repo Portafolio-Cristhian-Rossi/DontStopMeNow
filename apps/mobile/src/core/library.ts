@@ -1,4 +1,11 @@
-import type { Album, Catalog, Playlist, Selection, Track } from '@dsmn/shared';
+import {
+  resolveSelection,
+  type Album,
+  type Catalog,
+  type Playlist,
+  type Selection,
+  type Track,
+} from '@dsmn/shared';
 
 /** Id de la lista especial Favoritas en la app (no choca con los de las listas, que son UUID). */
 export const FAVORITES_ID = 'favoritas';
@@ -38,16 +45,6 @@ export function libraryView(catalog: Catalog, downloadedIds: Set<string>): Libra
   return { albums, artists, playlists, tracks, favorites };
 }
 
-function selectedTrackIds(catalog: Catalog, selection: Selection[]): Set<string> {
-  const albums = new Map(catalog.albums.map((a) => [a.id, a.trackIds]));
-  const playlists = new Map(catalog.playlists.map((p) => [p.id, p.trackIds]));
-  const ids = new Set<string>();
-  for (const sel of selection) {
-    for (const id of (sel.kind === 'album' ? albums : playlists).get(sel.id) ?? []) ids.add(id);
-  }
-  return ids;
-}
-
 /** Función que suma tamaños de canciones; arma el índice una sola vez por catálogo. */
 export function sizeLookup(catalog: Catalog): (trackIds: string[]) => number {
   const sizes = new Map(catalog.tracks.map((t) => [t.id, t.size]));
@@ -59,7 +56,7 @@ export function selectionSummary(
   catalog: Catalog,
   selection: Selection[],
 ): { trackCount: number; bytes: number } {
-  const ids = selectedTrackIds(catalog, selection);
+  const ids = resolveSelection(catalog, selection).trackIds;
   return { trackCount: ids.size, bytes: sizeLookup(catalog)([...ids]) };
 }
 

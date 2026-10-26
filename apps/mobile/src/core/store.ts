@@ -1,4 +1,5 @@
 import type { Catalog, LocalDownload, QueueState, Selection } from '@dsmn/shared';
+import { supersededBy, type PendingChange, type StoredChange } from './pending.ts';
 import type { PairedServer, SqlDb } from './types.ts';
 
 export type StoredDownload = LocalDownload & { path: string; size: number };
@@ -39,6 +40,9 @@ const SCHEMA = `
   );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pending_changes (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT, json TEXT NOT NULL
   );
 `;
 
@@ -144,6 +148,27 @@ export class LocalStore {
 
   updateDownloadPath(trackId: string, path: string): void {
     this.db.run('UPDATE downloads SET path = ? WHERE track_id = ?', path, trackId);
+  }
+
+  /** Cambios hechos en el celular que todavía no llegaron a la compu, en el orden en que se hicieron. */
+  getPending(): StoredChange[] {
+    return this.db
+      .all<{ seq: number; json: string }>('SELECT seq, json FROM pending_changes ORDER BY seq')
+      .map((r) => ({ seq: r.seq, change: JSON.parse(r.json) as PendingChange }));
+  }
+
+  /** Guarda un cambio nuevo y descarta los que deja sin efecto. */
+  addPending(change: PendingChange): void {
+    for (const seq of supersededBy(change, this.getPending())) this.removePending(seq);
+    this.db.run('INSERT INTO pending_changes (json) VALUES (?)', JSON.stringify(change));
+  }
+
+  removePending(seq: number): void {
+    this.db.run('DELETE FROM pending_changes WHERE seq = ?', seq);
+  }
+
+  clearPending(): void {
+    this.db.run('DELETE FROM pending_changes');
   }
 
   getSetting(key: string): string | null {

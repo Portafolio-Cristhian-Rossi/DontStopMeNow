@@ -113,6 +113,23 @@ export const UpdatePlaylistRequestSchema = z
   });
 export type UpdatePlaylistRequest = z.infer<typeof UpdatePlaylistRequestSchema>;
 
+/**
+ * Lista nueva creada desde el celular: siempre manual y con el id que genera el celular, así una lista creada sin
+ * conexión ya tiene su id definitivo y reintentar el envío no la duplica.
+ */
+export const DeviceCreatePlaylistRequestSchema = z.object({
+  id: z.uuid(),
+  name: name(100),
+  trackIds: z.array(z.string()).max(10_000).default([]),
+});
+export type DeviceCreatePlaylistRequest = z.infer<typeof DeviceCreatePlaylistRequestSchema>;
+
+export const RenamePlaylistRequestSchema = z.object({ name: name(100) });
+export type RenamePlaylistRequest = z.infer<typeof RenamePlaylistRequestSchema>;
+
+export const AddTracksRequestSchema = z.object({ trackIds: z.array(z.string()).min(1).max(10_000) });
+export type AddTracksRequest = z.infer<typeof AddTracksRequestSchema>;
+
 export const RootSchema = z.object({
   id: z.number().int(),
   path: z.string(),

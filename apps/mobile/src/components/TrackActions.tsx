@@ -4,9 +4,11 @@ import { router } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { AccessibilityInfo, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApp } from '../state/AppContext.tsx';
 import { usePlayer } from '../state/PlayerContext.tsx';
 import { Text } from '../ui/Text.tsx';
 import { colors, radius } from '../ui/theme.ts';
+import { AddToList } from './AddToList.tsx';
 import { Cover } from './Cover.tsx';
 
 function Action({
@@ -30,17 +32,24 @@ function Action({
   );
 }
 
-/** Menú de una canción (botón "⋯" o mantener apretada la fila): encolar o ir a su álbum. */
+/**
+ * Menú de una canción (botón "⋯" o mantener apretada la fila): favorita, encolar, agregar a una lista, ir a su
+ * álbum y, dentro de una lista propia (`playlistId`), quitarla de esa lista.
+ */
 export function TrackActions({
   track,
   showAlbum = true,
+  playlistId,
   onClose,
 }: {
   track: Track | null;
   showAlbum?: boolean;
+  playlistId?: string;
   onClose(): void;
 }) {
   const player = usePlayer();
+  const app = useApp();
+  const [adding, setAdding] = useState<string[] | null>(null);
   const insets = useSafeAreaInsets();
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -53,47 +62,69 @@ export function TrackActions({
     action();
   };
 
+  const favorite = Boolean(track?.favoritedAt);
+
   return (
-    <Modal
-      visible={track !== null}
-      transparent
-      animationType={reduceMotion ? 'none' : 'slide'}
-      onRequestClose={onClose}
-      statusBarTranslucent
-      navigationBarTranslucent
-    >
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar el menú" />
-      {track && (
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]} accessibilityRole="menu">
-          <View style={styles.grabber} />
-          <View style={styles.head}>
-            <Cover coverId={track.coverId} title={track.title} size={48} />
-            <View style={styles.headText}>
-              <Text style={styles.title} numberOfLines={2}>
-                {track.title}
-              </Text>
-              <Text style={styles.muted} numberOfLines={1}>
-                {track.artist}
-              </Text>
+    <>
+      <Modal
+        visible={track !== null}
+        transparent
+        animationType={reduceMotion ? 'none' : 'slide'}
+        onRequestClose={onClose}
+        statusBarTranslucent
+        navigationBarTranslucent
+      >
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar el menú" />
+        {track && (
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]} accessibilityRole="menu">
+            <View style={styles.grabber} />
+            <View style={styles.head}>
+              <Cover coverId={track.coverId} title={track.title} size={48} />
+              <View style={styles.headText}>
+                <Text style={styles.title} numberOfLines={2}>
+                  {track.title}
+                </Text>
+                <Text style={styles.muted} numberOfLines={1}>
+                  {track.artist}
+                </Text>
+              </View>
             </View>
-          </View>
-          <Action
-            icon="return-down-forward"
-            label="Reproducir a continuación"
-            onPress={run(() => player.playNext(track.id))}
-          />
-          <Action icon="list" label="Agregar a la cola" onPress={run(() => player.addToQueue(track.id))} />
-          {showAlbum && (
             <Action
-              icon="disc-outline"
-              label="Ir al álbum"
-              onPress={run(() => router.push({ pathname: '/album/[id]', params: { id: track.albumId } }))}
+              icon={favorite ? 'heart-dislike-outline' : 'heart-outline'}
+              label={favorite ? 'Quitar de Favoritas' : 'Agregar a Favoritas'}
+              onPress={run(() => app.setFavorite(track.id, !favorite))}
             />
-          )}
-          <Action icon="close" label="Cancelar" onPress={onClose} />
-        </View>
-      )}
-    </Modal>
+            <Action
+              icon="return-down-forward"
+              label="Reproducir a continuación"
+              onPress={run(() => player.playNext(track.id))}
+            />
+            <Action icon="list" label="Agregar a la cola" onPress={run(() => player.addToQueue(track.id))} />
+            <Action
+              icon="add-circle-outline"
+              label="Agregar a lista…"
+              onPress={run(() => setAdding([track.id]))}
+            />
+            {playlistId && (
+              <Action
+                icon="remove-circle-outline"
+                label="Quitar de esta lista"
+                onPress={run(() => app.removeFromPlaylist(playlistId, track.id))}
+              />
+            )}
+            {showAlbum && (
+              <Action
+                icon="disc-outline"
+                label="Ir al álbum"
+                onPress={run(() => router.push({ pathname: '/album/[id]', params: { id: track.albumId } }))}
+              />
+            )}
+            <Action icon="close" label="Cancelar" onPress={onClose} />
+          </View>
+        )}
+      </Modal>
+      <AddToList trackIds={adding} onClose={() => setAdding(null)} />
+    </>
   );
 }
 

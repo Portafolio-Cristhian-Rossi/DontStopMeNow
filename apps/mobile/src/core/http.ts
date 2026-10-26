@@ -1,4 +1,5 @@
 import { CatalogSchema, type Catalog } from '@dsmn/shared';
+import { changeRequest, type PendingChange } from './pending.ts';
 import type { FetchLike } from './types.ts';
 
 export class UnauthorizedError extends Error {}
@@ -64,6 +65,8 @@ export interface ServerClient {
   trackUrl(id: string): string;
   coverUrl(id: string): string;
   authHeaders(): Record<string, string>;
+  /** Manda a la compu un cambio hecho en el celular (favorita o lista). */
+  applyChange(change: PendingChange): Promise<void>;
 }
 
 export function createServerClient(opts: {
@@ -77,6 +80,19 @@ export function createServerClient(opts: {
     authHeaders,
     trackUrl: (id) => `${opts.baseUrl}/api/tracks/${encodeURIComponent(id)}/file`,
     coverUrl: (id) => `${opts.baseUrl}/api/covers/${encodeURIComponent(id)}`,
+    async applyChange(change) {
+      const { method, path, body } = changeRequest(change);
+      const headers: Record<string, string> = authHeaders();
+      // Sin cuerpo no va Content-Type: el servidor rechaza un JSON vacío.
+      if (body) headers['Content-Type'] = 'application/json';
+      const res = await send(
+        opts.fetch,
+        `${opts.baseUrl}${path}`,
+        { method, headers, body: body ? JSON.stringify(body) : undefined },
+        opts.timeoutMs,
+      );
+      await throwIfError(res);
+    },
     async catalog(etag) {
       const headers: Record<string, string> = authHeaders();
       if (etag) headers['If-None-Match'] = etag;

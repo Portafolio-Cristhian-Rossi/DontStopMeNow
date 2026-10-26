@@ -49,7 +49,7 @@ export default function Reproductor() {
   const player = usePlayer();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { catalog } = useApp();
+  const { catalog, setFavorite } = useApp();
   const { current, queue, playing, positionMs, durationMs } = usePlayerSnapshot();
   const [seeking, setSeeking] = useState<number | null>(null);
   const [sheet, setSheet] = useState(false);
@@ -68,7 +68,8 @@ export default function Reproductor() {
   const nextTrack = tracks.get(queue.order[queue.index + 1] ?? '');
   const shown = seeking ?? positionMs;
   const disc = Math.min(300, width - 80);
-  const favorite = Boolean(current.favoritedAt);
+  // Del catálogo y no de la canción que tiene el reproductor: así el corazón cambia apenas se toca.
+  const favorite = Boolean((tracks.get(current.id) ?? current).favoritedAt);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
@@ -108,17 +109,19 @@ export default function Reproductor() {
               {current.artist}
             </Text>
           </View>
-          <View
+          <Pressable
             style={styles.round}
-            accessible
-            accessibilityLabel={favorite ? 'Está en Favoritas' : 'No está en Favoritas'}
+            onPress={() => setFavorite(current.id, !favorite)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: favorite }}
+            accessibilityLabel="Favorita"
           >
             <Ionicons
               name={favorite ? 'heart' : 'heart-outline'}
               size={26}
-              color={favorite ? colors.accent : colors.faint}
+              color={favorite ? colors.accent : colors.textSoft}
             />
-          </View>
+          </Pressable>
         </View>
 
         <View style={styles.progress}>

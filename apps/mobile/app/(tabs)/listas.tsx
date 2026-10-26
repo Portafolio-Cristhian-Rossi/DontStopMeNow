@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
-import { useMemo } from 'react';
+import { Link, router } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { NameDialog } from '../../src/components/NameDialog.tsx';
 import { ScreenHeader } from '../../src/components/ScreenHeader.tsx';
 import { FAVORITES_ID, libraryView } from '../../src/core/library.ts';
 import { useApp } from '../../src/state/AppContext.tsx';
+import { Button } from '../../src/ui/Button.tsx';
 import { Text } from '../../src/ui/Text.tsx';
 import { colors, radius } from '../../src/ui/theme.ts';
 
@@ -48,14 +50,23 @@ function ListCard({
   );
 }
 
-/** Favoritas primero y después las listas bajadas al celular. */
+/** Favoritas primero y después las listas bajadas al celular (y las propias recién creadas, aunque estén vacías). */
 export default function Listas() {
-  const { catalog, downloadedIds } = useApp();
+  const { catalog, downloadedIds, selection, createPlaylist } = useApp();
+  const [naming, setNaming] = useState(false);
   const view = useMemo(
     () => (catalog ? libraryView(catalog, downloadedIds) : null),
     [catalog, downloadedIds],
   );
-  const playlists = view?.playlists ?? [];
+  const playlists = useMemo(() => {
+    const shown = view?.playlists ?? [];
+    const ids = new Set(shown.map((p) => p.id));
+    const marked = new Set(selection.filter((s) => s.kind === 'playlist').map((s) => s.id));
+    const empty = (catalog?.playlists ?? []).filter(
+      (p) => p.type === 'manual' && marked.has(p.id) && !ids.has(p.id),
+    );
+    return [...shown, ...empty.map((p) => ({ ...p, trackIds: [] }))];
+  }, [view, catalog, selection]);
   const favorites = view?.favorites.length ?? 0;
 
   return (
@@ -70,9 +81,10 @@ export default function Listas() {
             <ListCard
               id={FAVORITES_ID}
               name="Favoritas"
-              meta={favorites ? songs(favorites) : 'Tocá el corazón en la web y aparecen acá'}
+              meta={favorites ? songs(favorites) : 'Tocá el corazón en una canción y aparece acá'}
               favorites
             />
+            <Button title="Nueva lista" icon="add" onPress={() => setNaming(true)} />
             <Text style={styles.section} accessibilityRole="header">
               Tus listas
             </Text>
@@ -80,13 +92,24 @@ export default function Listas() {
         }
         ListEmptyComponent={
           <Text style={styles.muted}>
-            Todavía no bajaste ninguna lista. Marcalas en Descargas y sincronizá.
+            Todavía no hay listas en el celular. Creá una o marcalas en Descargas y sincronizá.
           </Text>
         }
         renderItem={({ item }) => (
           <ListCard id={item.id} name={item.name} meta={songs(item.trackIds.length)} />
         )}
       />
+      {naming && (
+        <NameDialog
+          title="Nueva lista"
+          confirmLabel="Crear"
+          onClose={() => setNaming(false)}
+          onSubmit={(name) => {
+            const id = createPlaylist(name);
+            router.push({ pathname: '/lista/[id]', params: { id } });
+          }}
+        />
+      )}
     </View>
   );
 }

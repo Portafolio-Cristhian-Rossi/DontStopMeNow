@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { formatBytes, searchKey, type Catalog, type Selection } from '@dsmn/shared';
+import { formatBytes, resolveSelection, searchKey, type Catalog, type Selection } from '@dsmn/shared';
 import { router } from 'expo-router';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Cover } from '../../src/components/Cover.tsx';
 import { ScreenHeader } from '../../src/components/ScreenHeader.tsx';
 import { folderLabel } from '../../src/core/fileNames.ts';
-import { libraryView, selectionSummary, sizeLookup } from '../../src/core/library.ts';
+import { FAVORITES_ID, libraryView, selectionSummary, sizeLookup } from '../../src/core/library.ts';
 import { useApp, useSyncProgress } from '../../src/state/AppContext.tsx';
 import { Button } from '../../src/ui/Button.tsx';
 import { Text } from '../../src/ui/Text.tsx';
@@ -27,10 +27,29 @@ interface Row {
   bytes: number;
   /** Todas sus canciones ya están en el celular. */
   onPhone: boolean;
+  /** Favoritas: en lugar de portada, el corazón. */
+  favorites?: boolean;
   search: string;
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Favoritas como una lista más para bajar: se actualiza sola con el corazón. */
+function favoritesRow(catalog: Catalog, downloaded: Set<string>, size: (ids: string[]) => number): Row {
+  const sel: Selection = { kind: 'favorites', id: FAVORITES_ID };
+  const ids = [...resolveSelection(catalog, [sel]).trackIds];
+  return {
+    key: 'favoritas',
+    sel,
+    title: 'Favoritas',
+    subtitle: `${plural(ids.length, 'canción', 'canciones')} · se arma sola con el corazón`,
+    coverId: null,
+    bytes: size(ids),
+    onPhone: ids.length > 0 && ids.every((id) => downloaded.has(id)),
+    search: searchKey('favoritas'),
+    favorites: true,
+  };
+}
 
 function buildRows(catalog: Catalog, downloaded: Set<string>): Record<Tab, Row[]> {
   const size = sizeLookup(catalog);
@@ -47,16 +66,19 @@ function buildRows(catalog: Catalog, downloaded: Set<string>): Record<Tab, Row[]
       onPhone: all(a.trackIds),
       search: searchKey(`${a.title} ${a.artist}`),
     })),
-    listas: catalog.playlists.map((p) => ({
-      key: `p-${p.id}`,
-      sel: { kind: 'playlist', id: p.id },
-      title: p.name,
-      subtitle: `${p.type === 'manual' ? 'Lista' : 'Carpeta'} · ${plural(p.trackIds.length, 'canción', 'canciones')}`,
-      coverId: p.trackIds.map((id) => covers.get(id)).find((c) => c) ?? null,
-      bytes: size(p.trackIds),
-      onPhone: all(p.trackIds),
-      search: searchKey(p.name),
-    })),
+    listas: [
+      favoritesRow(catalog, downloaded, size),
+      ...catalog.playlists.map((p): Row => ({
+        key: `p-${p.id}`,
+        sel: { kind: 'playlist', id: p.id },
+        title: p.name,
+        subtitle: `${p.type === 'manual' ? 'Lista' : 'Carpeta'} · ${plural(p.trackIds.length, 'canción', 'canciones')}`,
+        coverId: p.trackIds.map((id) => covers.get(id)).find((c) => c) ?? null,
+        bytes: size(p.trackIds),
+        onPhone: all(p.trackIds),
+        search: searchKey(p.name),
+      })),
+    ],
   };
 }
 
@@ -82,7 +104,13 @@ const EntryRow = memo(function EntryRow({
         size={24}
         color={selected ? colors.accent : colors.faint}
       />
-      <Cover coverId={row.coverId} title={row.title} size={48} />
+      {row.favorites ? (
+        <View style={styles.heart}>
+          <Ionicons name="heart" size={22} color={colors.accentText} />
+        </View>
+      ) : (
+        <Cover coverId={row.coverId} title={row.title} size={48} />
+      )}
       <View style={styles.flex}>
         <Text style={styles.rowTitle} numberOfLines={1}>
           {row.title}
@@ -103,7 +131,14 @@ const EntryRow = memo(function EntryRow({
 
 /** Estado del servidor: conectado, buscándolo, no encontrado o desvinculado. */
 function ServerCard() {
-  const { server, online, sync, startSync, unpair } = useApp();
+  const { server, online, sync, startSync, unpair, pendingCount } = useApp();
+  const pending =
+    pendingCount > 0 ? (
+      <Text style={styles.mutedSmall}>
+        {pendingCount === 1 ? '1 cambio' : `${pendingCount} cambios`} de favoritas o listas sin enviar a la
+        compu
+      </Text>
+    ) : null;
   if (!server) return null;
   const host = server.url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 
@@ -117,6 +152,7 @@ function ServerCard() {
             <Text style={styles.muted}>Lo que ya bajaste se sigue escuchando.</Text>
           </View>
         </View>
+        {pending}
         <Button
           title="Volver a vincular"
           icon="qr-code-outline"
@@ -136,6 +172,7 @@ function ServerCard() {
             <Text style={styles.muted}>Conectate al WiFi de tu casa con la compu prendida.</Text>
           </View>
         </View>
+        {pending}
         <Button title="Buscar de nuevo" icon="refresh" onPress={() => void startSync()} />
       </View>
     );
@@ -154,6 +191,7 @@ function ServerCard() {
           </Text>
         </View>
       </View>
+      {pending}
     </View>
   );
 }
@@ -510,6 +548,14 @@ const styles = StyleSheet.create({
   rowTitle: { fontWeight: '600' },
   rowEnd: { alignItems: 'flex-end', gap: 4 },
   size: { fontSize: 12, color: colors.textSoft },
+  heart: {
+    width: 48,
+    height: 48,
+    borderRadius: 7,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bar: { height: 4, borderRadius: 2, backgroundColor: colors.surface3, overflow: 'hidden', marginTop: 6 },
   barFill: { height: 4, backgroundColor: colors.accent },
   syncBar: {

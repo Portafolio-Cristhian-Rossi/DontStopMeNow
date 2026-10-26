@@ -13,6 +13,7 @@ import {
 import { AppState } from 'react-native';
 import { resolveServerUrl } from '../core/discovery.ts';
 import { ServerUnreachableError, UnauthorizedError, createServerClient } from '../core/http.ts';
+import { applyPending, flushPending, newPlaylistId, type PendingChange } from '../core/pending.ts';
 import { relocateDownloads, type RelocateReport } from '../core/relocate.ts';
 import { LocalStore, type StoredDownload } from '../core/store.ts';
 import {
@@ -38,6 +39,10 @@ const PROGRESS_THROTTLE_MS = 250;
 const KEEP_AWAKE_TAG = 'dsmn-sync';
 /** Ajuste guardado: dirección de la carpeta elegida para la música; sin él, la memoria del celular. */
 const MUSIC_FOLDER = 'musicFolder';
+/** Servidor al que pertenecen los cambios pendientes: si se vincula otro, se descartan. */
+const PENDING_SERVER = 'pendingServerId';
+/** Para mandar un cambio enseguida no se espera mucho: si no responde, va en la próxima sincronización. */
+const QUICK_TIMEOUT_MS = 5000;
 
 export interface SyncState {
   running: boolean;
@@ -88,6 +93,15 @@ export interface AppValue {
   relocate(): Promise<void>;
   /** Cuántas canciones bajadas no están en el destino actual (se pueden mover). */
   outsideTarget(): number;
+  /** Cambios de favoritas y listas que todavía no llegaron a la compu. */
+  pendingCount: number;
+  setFavorite(trackId: string, on: boolean): void;
+  /** Crea una lista (queda marcada para bajar) y devuelve su id. */
+  createPlaylist(name: string, trackIds?: string[]): string;
+  renamePlaylist(id: string, name: string): void;
+  deletePlaylist(id: string): void;
+  addToPlaylist(id: string, trackIds: string[]): void;
+  removeFromPlaylist(id: string, trackId: string): void;
 }
 
 const AppContext = createContext<AppValue | null>(null);
@@ -131,12 +145,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       downloads: store.getDownloads(),
       selection: store.getSelection(),
       musicFolder: store.getSetting(MUSIC_FOLDER),
+      pending: store.getPending().map((p) => p.change),
     }),
     [store],
   );
   const [local, setLocal] = useState(read);
   const reload = useCallback(() => setLocal(read()), [read]);
   const downloadedIds = useMemo(() => new Set(local.downloads.map((d) => d.trackId)), [local.downloads]);
+  // Lo que ve la app: el catálogo guardado con los cambios hechos en el celular aplicados encima.
+  const catalog = useMemo(
+    () => (local.catalog ? applyPending(local.catalog, local.pending) : null),
+    [local.catalog, local.pending],
+  );
 
   const [sync, setSync] = useState<SyncState>({ running: false, report: null, error: null });
   const [progress, setProgress] = useState<SyncProgress | null>(null);
@@ -151,6 +171,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     report: null,
   });
   const relocating = useRef(false);
+  const flushing = useRef<Promise<void> | null>(null);
 
   const startSync = useCallback((): Promise<void> => {
     const server = store.getServer();
@@ -164,6 +185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const job = (async () => {
       try {
+        await flushing.current;
         const url = await resolveServerUrl(server, { fetch: appFetch, discovery: deps.discovery });
         if (!url) throw new ServerUnreachableError();
         if (url !== server.url) store.updateServerUrl(url);
@@ -205,6 +227,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const stopSync = useCallback(() => controller.current?.abort(), []);
 
+  /**
+   * Manda enseguida los cambios pendientes si la compu estaba a mano, y trae el catálogo actualizado (sin él, el
+   * cambio "desaparecería" al salir de la cola). Si falla no pasa nada: van en la próxima sincronización.
+   */
+  const flushSoon = useCallback(() => {
+    const server = store.getServer();
+    if (!server || online !== true || flushing.current) return;
+    const job = (async () => {
+      try {
+        // Si está sincronizando, se espera: lo que mande esa sincronización ya no estará en la cola.
+        await running.current;
+        const client = createServerClient({
+          baseUrl: server.url,
+          token: server.token,
+          fetch: appFetch,
+          timeoutMs: QUICK_TIMEOUT_MS,
+        });
+        if ((await flushPending({ store, client })) === 0) return;
+        const fetched = await client.catalog(store.getCatalog()?.etag);
+        if (!fetched.notModified) store.setCatalog(fetched.catalog, fetched.etag);
+      } catch {
+        // Queda pendiente.
+      } finally {
+        flushing.current = null;
+        reload();
+      }
+    })();
+    flushing.current = job;
+  }, [store, online, reload]);
+
+  const edit = useCallback(
+    (change: PendingChange) => {
+      store.addPending(change);
+      reload();
+      flushSoon();
+    },
+    [store, reload, flushSoon],
+  );
+
   /** Detiene la sincronización en curso y espera a que termine (para no pisarse con otra acción). */
   const stopAndWait = useCallback(async () => {
     controller.current?.abort();
@@ -238,6 +299,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppValue>(
     () => ({
       ...local,
+      catalog,
+      pendingCount: local.pending.length,
       downloadedIds,
       sync,
       online,
@@ -256,6 +319,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       async pair(server) {
         await stopAndWait();
+        if (store.getSetting(PENDING_SERVER) !== server.serverId) store.clearPending();
+        store.setSetting(PENDING_SERVER, server.serverId);
         store.setServer(server);
         reload();
         void startSync();
@@ -294,6 +359,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         store.setSetting(MUSIC_FOLDER, null);
         reload();
       },
+      setFavorite: (trackId, on) => edit({ kind: 'favorite', trackId, on, at: Date.now() }),
+      createPlaylist(name, trackIds = []) {
+        const id = newPlaylistId();
+        // Marcada para bajar: así sus canciones quedan aunque se desmarque el álbum de donde salieron.
+        store.setSelected({ kind: 'playlist', id }, true);
+        edit({ kind: 'createPlaylist', id, name: name.trim(), trackIds });
+        return id;
+      },
+      renamePlaylist: (id, name) => edit({ kind: 'renamePlaylist', id, name: name.trim() }),
+      deletePlaylist(id) {
+        store.setSelected({ kind: 'playlist', id }, false);
+        edit({ kind: 'deletePlaylist', id });
+      },
+      addToPlaylist: (id, trackIds) => edit({ kind: 'addTracks', id, trackIds }),
+      removeFromPlaylist: (id, trackId) => edit({ kind: 'removeTrack', id, trackId }),
       outsideTarget: () => local.downloads.filter((d) => !files.isInTarget(d.path)).length,
       async relocate() {
         if (relocating.current) return;
@@ -323,6 +403,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       local,
+      catalog,
+      edit,
       downloadedIds,
       sync,
       online,

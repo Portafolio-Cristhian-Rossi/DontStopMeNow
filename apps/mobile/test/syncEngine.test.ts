@@ -28,6 +28,7 @@ function setup(
     trackUrl: URL,
     coverUrl: (id: string) => `http://srv/api/covers/${id}`,
     authHeaders: () => ({ Authorization: 'Bearer tok' }),
+    applyChange: vi.fn(async () => {}),
   };
   const store = new LocalStore(sqliteDb());
   const files = memoryFiles(opts.free);
@@ -297,5 +298,33 @@ describe('runSync con una carpeta elegida (la SD)', () => {
     expect(s.sleep).not.toHaveBeenCalled();
     expect(s.store.getDownloads()).toEqual([]);
     expect(s.files.list('/music')).toEqual([]);
+  });
+});
+
+describe('runSync con cambios hechos en el celular', () => {
+  it('los manda antes de pedir el catálogo', async () => {
+    const s = setup();
+    const order: string[] = [];
+    s.client.applyChange = vi.fn(async () => void order.push('cambio'));
+    const catalog = s.client.catalog;
+    s.client.catalog = vi.fn(async (etag?: string) => {
+      order.push('catálogo');
+      return catalog(etag);
+    });
+    s.store.addPending({ kind: 'favorite', trackId: 't1', on: true, at: 1 });
+    await s.run();
+    expect(order).toEqual(['cambio', 'catálogo']);
+    expect(s.store.getPending()).toEqual([]);
+  });
+
+  it('sin conexión al mandarlos, no sigue y quedan guardados', async () => {
+    const s = setup();
+    s.client.applyChange = vi.fn(async () => {
+      throw new ServerUnreachableError();
+    });
+    s.store.addPending({ kind: 'favorite', trackId: 't1', on: true, at: 1 });
+    await expect(s.run()).rejects.toBeInstanceOf(ServerUnreachableError);
+    expect(s.client.catalog).not.toHaveBeenCalled();
+    expect(s.store.getPending()).toHaveLength(1);
   });
 });

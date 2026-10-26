@@ -1,5 +1,6 @@
 import { FINGERPRINT_WINDOW, computeSyncPlan, fingerprintFromWindows, type Track } from '@dsmn/shared';
 import { ServerUnreachableError, UnauthorizedError, type ServerClient } from './http.ts';
+import { flushPending } from './pending.ts';
 import type { LocalStore } from './store.ts';
 import type { Downloader, FileStore } from './types.ts';
 
@@ -101,8 +102,10 @@ export async function runSync(deps: SyncDeps): Promise<SyncReport> {
   const report: SyncReport = { downloaded: 0, deleted: 0, failed: [], paused: false };
   const emit = (p: SyncProgress) => deps.onProgress?.(p);
 
-  // 1. Catálogo (antes de tocar archivos: un token revocado o el servidor caído cortan acá).
+  // 1. Cambios hechos en el celular (favoritas, listas) y después el catálogo, que ya los trae. Antes de tocar
+  // archivos: un token revocado o el servidor caído cortan acá.
   emit({ phase: 'catalog', done: 0, total: 0, bytesDone: 0, bytesTotal: 0 });
+  await flushPending({ store, client });
   const stored = store.getCatalog();
   const fetched = await client.catalog(stored?.etag);
   let catalog = stored?.catalog;
